@@ -731,6 +731,34 @@ local stampByFid = {} -- featureID -> stamp
 ---@type table<integer, boolean?>
 local pending = {} -- featureID -> trustGround (features waiting for their first stamp)
 
+-- Composite of the stack: the height every stamped vertex should have, later
+-- stamps winning. Rebuilt lazily after any stack change; the reconcile walks it.
+local topXs, topZs, topHs, topN = scratch(), scratch(), scratch(), 0
+local topDirty = false
+local reconcileVert = 1
+
+local function rebuildTop()
+	topXs, topZs, topHs, topN = scratch(), scratch(), scratch(), 0
+	local index = scratch() -- vertex key -> slot
+	for i = 1, #stamps do
+		local s = stamps[i]
+		local xs, zs, hs = s.xs, s.zs, s.hs
+		for j = 1, s.n do
+			local key = xs[j] * 65536 + zs[j]
+			local slot = index[key]
+			if not slot then
+				topN = topN + 1
+				slot = topN
+				index[key] = slot
+				topXs[slot], topZs[slot] = xs[j], zs[j]
+			end
+			topHs[slot] = hs[j]
+		end
+	end
+	topDirty = false
+	reconcileVert = 1
+end
+
 local function lock(fid)
 	-- enabled = true with zero velocity/acceleration: the feature never moves
 	-- on its own and the ground may rise over it without it popping up
@@ -813,6 +841,7 @@ local function pushStamp(stamp, trusted)
 	hardenCells(stamp.cells)
 	stamps[#stamps + 1] = stamp
 	stampByFid[stamp.fid] = stamp
+	topDirty = true
 end
 
 -- Take the topmost stamp off again. Unwinding (final = false) always puts
@@ -822,6 +851,7 @@ local function popStamp(final)
 	local stamp = stamps[#stamps]
 	stamps[#stamps] = nil
 	stampByFid[stamp.fid] = nil
+	topDirty = true
 	softenCells(stamp.cells)
 	local ground = (final and not stamp.trusted) and relaxFill(stamp) or stamp.before
 	applyHeights(stamp.xs, stamp.zs, ground, stamp.n)
@@ -962,7 +992,6 @@ end
 ----------------------------------------------------------------
 -- Callins
 ----------------------------------------------------------------
-local reconcileStamp, reconcileVert = 1, 1
 
 function gadget:Initialize()
 	if not next(meshDefs) then
@@ -1086,41 +1115,35 @@ function gadget:GameFrame(frame)
 		end
 	end
 
-	-- Height reconcile: walk the stamps a budget of vertices per frame and
-	-- re-assert any stamp whose ground no longer matches (craters, brush).
-	-- Only the vertices that disagree are put back (one batch per frame), so a
-	-- single stray vertex never re-applies a 50k-vertex stamp.
+	-- Height reconcile: walk the composite of every stamp (the topmost stamp
+	-- owns a vertex two meshes share) a budget of vertices per frame and put
+	-- back the ones that disagree, one batch per frame. Checking each stamp
+	-- against its own heights made two overlapping copies of a mesh fix each
+	-- other's vertices forever (2026-09-08: the city, 1500 vertices a frame).
+	if topDirty then
+		rebuildTop()
+	end
+	if topN == 0 then
+		return
+	end
 	---@type number
 	local budget = RECONCILE_BUDGET
 	local fixXs, fixZs, fixHs, fixN = scratch(), scratch(), scratch(), 0
-	while budget > 0 do
-		if reconcileStamp > n then
-			reconcileStamp, reconcileVert = 1, 1
-		end
-		local s = stamps[reconcileStamp]
-		local xs, zs, hs = s.xs, s.zs, s.hs
-		local i = reconcileVert
-		local last = min(s.n, i + budget - 1)
-		while i <= last do
-			local found = spGetGroundHeight(xs[i] * SQ, zs[i] * SQ)
-			if abs(found - hs[i]) > HEIGHT_EPSILON then
-				fixN = fixN + 1
-				fixXs[fixN], fixZs[fixN], fixHs[fixN] = xs[i], zs[i], hs[i]
-				statLastFix = { xs[i] * SQ, zs[i] * SQ, hs[i], found, frame }
-			end
-			i = i + 1
-		end
-		budget = budget - (i - reconcileVert)
-		if i > s.n then
-			reconcileStamp, reconcileVert = reconcileStamp + 1, 1
-		else
-			reconcileVert = i
-		end
-		if reconcileStamp > n and reconcileVert == 1 then
-			-- one full pass done this frame; the rest waits for the next
-			break
-		end
+	local i = reconcileVert
+	if i > topN then
+		i = 1
 	end
+	local last = min(topN, i + budget - 1)
+	while i <= last do
+		local found = spGetGroundHeight(topXs[i] * SQ, topZs[i] * SQ)
+		if abs(found - topHs[i]) > HEIGHT_EPSILON then
+			fixN = fixN + 1
+			fixXs[fixN], fixZs[fixN], fixHs[fixN] = topXs[i], topZs[i], topHs[i]
+			statLastFix = { topXs[i] * SQ, topZs[i] * SQ, topHs[i], found, frame }
+		end
+		i = i + 1
+	end
+	reconcileVert = i
 	if fixN > 0 then
 		applyHeights(fixXs, fixZs, fixHs, fixN)
 		statFixes = statFixes + 1
