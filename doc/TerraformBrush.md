@@ -419,9 +419,12 @@ ground. Terrain meshes also skip the placement wobble, which would re-stamp
 the ground on every frame of tilt.
 
 Two more tags shape what counts as ground. `terrainmesh_clearance` (default 16
-elmos) is head room: where the mesh's lowest surface is higher than that above
-the ground, the spot is open air (a floating block, a floorless arch, the
-underside of a bridge) and stays untouched. `terrainmesh_cap` lists model-space
+elmos) is head room measured from the model's placement plane: where the
+mesh's lowest surface is higher than that above the plane, the spot is open
+air (a floorless arch, the underside of a bridge) and stays untouched. It is
+measured against the model, not the map, so a model lifted with the gizmo
+keeps pulling the ground up to it: one block lifted 100 elmos is a 148-elmo
+cliff. `terrainmesh_cap` lists model-space
 rectangles, `"x1 z1 x2 z2 cap; ..."`, inside which surfaces higher than `cap`
 are ignored. That is the explicit answer for a roofed passage whose model has
 its own floor under the roof: no vertical probe can tell a hollow pillar from

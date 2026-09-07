@@ -125,10 +125,12 @@ end
 -- puts it OUTSIDE for a mesh that is not grid-aligned, a berm climbing up to
 -- half the wall (seen 2026-09-07 with the old half-cell default), so one cell
 -- is the floor and models keep their walls a couple of elmos outside their
--- stamped footprint. The clearance (default 16) is the grounded test: a spot
--- of ground only follows the mesh where the mesh's LOWEST surface is within
--- that many elmos of it, so an arch's passage, a bridge deck's underside or a
--- roof on pillars stays open ground while the pillars still raise it. The
+-- stamped footprint. The clearance (default 16) is head room measured from
+-- the model's placement plane: a spot of ground only follows the mesh where
+-- the mesh's LOWEST surface is within that many elmos above the plane, so an
+-- arch's passage, a bridge deck's underside or a roof on pillars stays open
+-- ground while the pillars still raise it, and a model lifted with the gizmo
+-- still pulls the ground up to it. The
 -- sink (default 0) lowers the stamped
 -- ground below the mesh surface; the depth tie between the plateau and the top
 -- face is resolved on the render side instead (cus_gl4 draws the terrainmesh
@@ -456,18 +458,17 @@ local function rasterize(mesh, px, py, pz, xdx, xdy, xdz, ydx, ydy, ydz, zdx, zd
 		end
 	end
 
-	-- grounded test: a sample only counts where the mesh's lowest surface is
-	-- within `clearance` of the ground there, so the passage under an arch or
-	-- a bridge stays open while pillars and walls raise the ground
-	for gz = gz1, gz2 do
-		local row = (gz - gz1) * gw
-		local zw = gz * FINE
-		for gx = gx1, gx2 do
-			local idx = row + (gx - gx1) + 1
-			local low = lowest[idx]
-			if low and low > spGetGroundHeight(gx * FINE, zw) + clearance then
-				cover[idx] = nil
-			end
+	-- head-room test: a sample only counts where the mesh's lowest surface is
+	-- within `clearance` of the model's own placement plane, so the passage
+	-- under an arch or a bridge stays open while pillars and walls raise the
+	-- ground. Measured against the model, not the map: a whole model lifted
+	-- with the gizmo keeps pulling the ground up to it (a cliff of any height
+	-- from one block), which measuring against the ground threw away.
+	local headRoom = py + clearance
+	for idx = 1, gw * (gz2 - gz1 + 1) do
+		local low = lowest[idx]
+		if low and low > headRoom then
+			cover[idx] = nil
 		end
 	end
 
