@@ -394,7 +394,10 @@ matrix columns, so no Euler convention is involved) and stamps it. Models
 should carry a skirt below their origin, and `terrainmesh_inset` (default 4
 elmos, half a heightmap cell) only raises a vertex when the mesh also covers
 that much ground around it, which keeps the terrain's climb up to the top
-surface inside the side walls.
+surface inside the side walls. `terrainmesh_sink` (default 3 elmos) stamps the
+ground that far below the mesh surface: a plateau exactly on the top face
+z-fights with it as the camera moves, and units standing three elmos inside
+the model are invisible.
 
 Why the feature is pinned with `SetFeatureMoveCtrl(enabled = true)` and zero
 vectors rather than the masks-only lock used for lifted features:

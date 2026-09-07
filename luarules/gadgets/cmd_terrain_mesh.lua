@@ -76,10 +76,13 @@ end
 ----------------------------------------------------------------
 -- Defs
 ----------------------------------------------------------------
--- defID -> { inset = elmos }. The inset is how far past a vertex the mesh must
--- also cover before that vertex is raised: with the default half cell, the
--- terrain slope up to the top surface lands INSIDE the mesh's side walls
--- instead of poking out of them.
+-- defID -> { inset = elmos, sink = elmos }. The inset is how far past a vertex
+-- the mesh must also cover before that vertex is raised: with the default half
+-- cell, the terrain slope up to the top surface lands INSIDE the mesh's side
+-- walls instead of poking out of them. The sink lowers the stamped ground below
+-- the mesh surface so the two never share a depth (a plateau exactly on the
+-- top face z-fights with it as the camera moves); three elmos hold at any zoom
+-- and units standing that deep inside the model are invisible.
 ---@type table
 local meshDefs = {} -- defID -> { inset = elmos, name = defName }
 for defID, def in pairs(FeatureDefs) do
@@ -96,7 +99,8 @@ for defID, def in pairs(FeatureDefs) do
 		else
 			inset = SQ / 8
 		end
-		meshDefs[defID] = { inset = inset, name = def.name }
+		local sink = tonumber(cp.terrainmesh_sink) or 3
+		meshDefs[defID] = { inset = inset, sink = sink, name = def.name }
 	end
 end
 
@@ -651,6 +655,12 @@ local function computeStamp(fid)
 	local r = rasterize(mesh, t[1], t[2], t[3], t[4], t[5], t[6], t[7], t[8], t[9], t[10], t[11], t[12], info.inset)
 	if not r then
 		return nil
+	end
+	if info.sink ~= 0 then
+		local hs = r.hs
+		for i = 1, r.n do
+			hs[i] = hs[i] - info.sink
+		end
 	end
 	r.fid = fid
 	r.transform = t

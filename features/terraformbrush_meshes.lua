@@ -14,6 +14,9 @@
 --                                   the side walls (default 4 = half a cell).
 --                                   Models should carry a skirt below their
 --                                   origin for the same reason.
+--   customparams.terrainmesh_sink   elmos the stamped ground sits below the
+--                                   mesh surface (default 3): a plateau exactly
+--                                   on the top face z-fights with it.
 --   blocking = false                units path over the raised ground, not
 --                                   around a footprint; walls stop them by
 --                                   slope like any cliff
@@ -52,6 +55,7 @@ local block = {
 		set = "terraformbrush",
 		terrainmesh = "1",
 		terrainmesh_inset = "4",
+		terrainmesh_sink = "3",
 		normalmaps = "yes",
 		normaltex = "unittextures/tf_concrete_block_normal.png",
 		cuspbr = "yes",
