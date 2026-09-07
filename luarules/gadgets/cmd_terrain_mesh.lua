@@ -727,6 +727,35 @@ local function reapply(stamp)
 	applyHeights(stamp.xs, stamp.zs, stamp.hs, stamp.n)
 end
 
+-- /luarules tmesh          status
+-- /luarules tmesh restamp  recompute every stamp
+local function chatTMesh(cmd, line, words, playerID)
+	if words[1] == "restamp" then
+		if not Spring.IsCheatingEnabled() then
+			spEcho("[Terrain Mesh] restamp requires /cheat")
+			return true
+		end
+		---@type table<integer, integer>
+		local fids = {}
+		for i = 1, #stamps do
+			fids[i] = stamps[i].fid
+		end
+		for i = 1, #fids do
+			stampFeature(fids[i], true)
+		end
+		spEcho("[Terrain Mesh] restamped " .. #fids .. " meshes")
+		return true
+	end
+	local verts = 0
+	for i = 1, #stamps do
+		verts = verts + stamps[i].n
+	end
+	spEcho(
+		string.format("[Terrain Mesh] %d meshes, %d vertices pinned, terrain type %s", #stamps, verts, tostring(hardTT))
+	)
+	return true
+end
+
 ----------------------------------------------------------------
 -- Callins
 ----------------------------------------------------------------
@@ -748,6 +777,8 @@ function gadget:Initialize()
 			pending[fid] = false
 		end
 	end
+	-- registered here, not at file scope: the handler needs the gadget loaded first
+	gadgetHandler:AddChatAction("tmesh", chatTMesh, "Terrain mesh status / restamp")
 	GG.TerrainMesh = {
 		isMeshDef = function(defID)
 			return meshDefs[defID] ~= nil
@@ -773,6 +804,7 @@ function gadget:Initialize()
 end
 
 function gadget:Shutdown()
+	gadgetHandler:RemoveChatAction("tmesh")
 	GG.TerrainMesh = nil
 end
 
@@ -876,37 +908,6 @@ function gadget:GameFrame(frame)
 		end
 	end
 end
-
--- /luarules tmesh          status
--- /luarules tmesh restamp  recompute every stamp
-local function chatTMesh(cmd, line, words, playerID)
-	if words[1] == "restamp" then
-		if not Spring.IsCheatingEnabled() then
-			spEcho("[Terrain Mesh] restamp requires /cheat")
-			return true
-		end
-		---@type table<integer, integer>
-		local fids = {}
-		for i = 1, #stamps do
-			fids[i] = stamps[i].fid
-		end
-		for i = 1, #fids do
-			stampFeature(fids[i], true)
-		end
-		spEcho("[Terrain Mesh] restamped " .. #fids .. " meshes")
-		return true
-	end
-	local verts = 0
-	for i = 1, #stamps do
-		verts = verts + stamps[i].n
-	end
-	spEcho(
-		string.format("[Terrain Mesh] %d meshes, %d vertices pinned, terrain type %s", #stamps, verts, tostring(hardTT))
-	)
-	return true
-end
-
-gadgetHandler:AddChatAction("tmesh", chatTMesh, "Terrain mesh status / restamp")
 
 -- Test hooks (offline harness only; nothing in the game sets the global).
 if rawget(_G, "TerrainMeshHarness") then
