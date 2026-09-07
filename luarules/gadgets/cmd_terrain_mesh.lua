@@ -868,6 +868,11 @@ local function stampFeature(fid, trustGround)
 	return true
 end
 
+-- diagnostics for /luarules tmesh: how often the ground had to be put back and
+-- how often a mesh moved on its own; the first few of each are echoed
+local statFixes, statFixVerts, statRestamps = 0, 0, 0
+local statLastFix = nil -- { x, z, expected, found, frame }
+
 -- /luarules tmesh              status
 -- /luarules tmesh restamp      recompute every stamp
 -- /luarules tmesh probe        heights along the centre row and column of every stamp
@@ -958,10 +963,6 @@ end
 -- Callins
 ----------------------------------------------------------------
 local reconcileStamp, reconcileVert = 1, 1
--- diagnostics for /luarules tmesh: how often the ground had to be put back and
--- how often a mesh moved on its own; the first few of each are echoed
-local statFixes, statFixVerts, statRestamps = 0, 0, 0
-local statLastFix = nil -- { x, z, expected, found, frame }
 
 function gadget:Initialize()
 	if not next(meshDefs) then
