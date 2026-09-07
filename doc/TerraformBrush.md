@@ -444,9 +444,15 @@ would, so a footprint can be checked before a game is started. The Structures
 category ships two such conversions as examples, both CC-BY-4.0 with the
 credit lines in `features/terraformbrush_meshes.lua`: the Sci-Fi Gate (Free
 Models., 1088 triangles, atlas) and the Cyberpunk City (Pasha, 289k triangles,
-about 6150 elmos wide at scale 0.332, single tiled texture; the 17 MB model
-is a stress test as much as an asset: its stamp pins some 600k vertices,
-sampled per vertex rather than per half cell above 1.2M coverage cells).
+about 6150 elmos wide at scale 0.332; the 17 MB model is a stress test as
+much as an asset: its stamp pins some 600k vertices, sampled per vertex rather
+than per half cell above 1.2M coverage cells). The city's own UVs are a
+single photo projected from one camera and smear from any other angle, so it
+is exported with `--uv-mode box`: the source UVs are dropped and a seamless
+texture pair is projected along the world axes, walls taking the two axes
+across their face and roofs and streets pinned to a plain texel. The pair is
+`unittextures/tf_facade_*.png` from `tools/tf_facade_tex.py`, dark concrete
+with a window grid, a share of the windows lit and emissive.
 
 Overlapping meshes stack in placement order; removing one unwinds the stamps
 above it and re-applies them. A mesh whose ground is not known to be real (a
