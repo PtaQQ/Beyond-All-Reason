@@ -65,4 +65,83 @@ local block = {
 	},
 }
 
-return { [block.name] = block }
+-- Converted Sketchfab assets (c:/BAR-Github/tools/gltf2s3o.py), both CC-BY-4.0.
+-- Attribution required wherever they ship:
+--   This work is based on "Sci Fi Gate for shooting games Low poly"
+--   (https://sketchfab.com/3d-models/sci-fi-gate-for-shooting-games-low-poly-c77cc1926ac94ceab223ea684c9e46e8)
+--   by Free Models. (https://sketchfab.com/hamzaunity3d) licensed under CC-BY-4.0
+--   (http://creativecommons.org/licenses/by/4.0/)
+--   This work is based on "Cyberpunk city"
+--   (https://sketchfab.com/3d-models/cyberpunk-city-f2c503f53e0a425bade4bff5786ef420)
+--   by Pasha (https://sketchfab.com/Pasha.) licensed under CC-BY-4.0
+--   (http://creativecommons.org/licenses/by/4.0/)
+-- Collision volumes are kept tiny on purpose: the raised ground is the
+-- collision, and a bounding box would swallow shots crossing the gate's
+-- passage or the city's streets.
+
+local function converted(name, description, object, author, credit, footX, footZ, height, midY)
+	return {
+		name = name,
+		description = description,
+		object = object,
+		blocking = false,
+		indestructible = true,
+		reclaimable = false,
+		autoreclaimable = false,
+		flammable = false,
+		burnable = false,
+		upright = true,
+		footprintX = footX,
+		footprintZ = footZ,
+		height = height,
+		hitdensity = 0,
+		mass = 100000,
+		crushResistance = 100000,
+		damage = 999999,
+		energy = 0,
+		metal = 0,
+		reclaimTime = 0,
+		collisionVolumeType = "box",
+		collisionVolumeScales = "8 8 8",
+		collisionVolumeOffsets = "0 0 0",
+		customparams = {
+			model_author = author,
+			credit = credit,
+			category = "structures",
+			set = "terraformbrush",
+			terrainmesh = "1",
+			cuspbr = "yes",
+			treeshader = "no",
+		},
+	}
+end
+
+local gate = converted(
+	"tf_scifi_gate",
+	"Sci-Fi Gate",
+	"terraformbrush/tf_scifi_gate.s3o",
+	"Free Models. (Sketchfab)",
+	"Sci Fi Gate for shooting games Low poly by Free Models., CC-BY-4.0",
+	9,
+	5,
+	51,
+	25.5
+)
+-- the passage: the model's floor slab runs under the arch, so only a cap keeps the
+-- roof (and the lamp hanging at 27 elmos) from becoming ground; the floor and the
+-- 18-elmo door under it still count
+gate.customparams.terrainmesh_cap = "-52 -18 52 18 20"
+
+local city = converted(
+	"tf_cyberpunk_city",
+	"Cyberpunk City",
+	"terraformbrush/tf_cyberpunk_city.s3o",
+	"Pasha (Sketchfab)",
+	"Cyberpunk city by Pasha, CC-BY-4.0",
+	128,
+	136,
+	299,
+	86
+)
+
+return { [block.name] = block, [gate.name] = gate, [city.name] = city }

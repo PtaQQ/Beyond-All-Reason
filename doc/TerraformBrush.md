@@ -418,6 +418,32 @@ re-stamp would chase it upward forever. The enabled branch never consults the
 ground. Terrain meshes also skip the placement wobble, which would re-stamp
 the ground on every frame of tilt.
 
+Two more tags shape what counts as ground. `terrainmesh_clearance` (default 16
+elmos) is head room: where the mesh's lowest surface is higher than that above
+the ground, the spot is open air (a floating block, a floorless arch, the
+underside of a bridge) and stays untouched. `terrainmesh_cap` lists model-space
+rectangles, `"x1 z1 x2 z2 cap; ..."`, inside which surfaces higher than `cap`
+are ignored. That is the explicit answer for a roofed passage whose model has
+its own floor under the roof: no vertical probe can tell a hollow pillar from
+a roofed passage (both show a floor, then a ceiling), so the def says where
+the passage is. The Sci-Fi Gate uses one rectangle with a 20-elmo cap: floor
+and door still count, roof and hanging lamp do not.
+
+Converted assets come from `c:/BAR-Github/tools/gltf2s3o.py`: it takes a glTF,
+GLB or a Sketchfab download zip, flattens the node hierarchy into one piece,
+scales (default 8 elmos per metre), re-centres, puts the origin at the largest
+flat surface, and merges materials into one texture pair, either an atlas with
+tiled regions (a low-poly kit whose wall texture repeats a few times) or a
+single texture whose UVs keep tiling (a SketchUp city with one facade texture
+repeated hundreds of times, flat-coloured faces pinned to the closest texel).
+`tools/tf_mesh_dump.lua` rasterises a converted s3o offline the way the gadget
+would, so a footprint can be checked before a game is started. The Structures
+category ships two such conversions as examples, both CC-BY-4.0 with the
+credit lines in `features/terraformbrush_meshes.lua`: the Sci-Fi Gate (Free
+Models., 1088 triangles, atlas) and the Cyberpunk City (Pasha, 289k triangles,
+2048 elmos wide, single tiled texture; the 17 MB model is a stress test as
+much as an asset).
+
 Overlapping meshes stack in placement order; removing one unwinds the stamps
 above it and re-applies them. A mesh whose ground is not known to be real (a
 project load, whose heightmap already carries the stamp, or a `/luarules

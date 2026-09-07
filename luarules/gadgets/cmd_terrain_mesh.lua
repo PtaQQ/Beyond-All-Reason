@@ -125,7 +125,11 @@ end
 -- puts it OUTSIDE for a mesh that is not grid-aligned, a berm climbing up to
 -- half the wall (seen 2026-09-07 with the old half-cell default), so one cell
 -- is the floor and models keep their walls a couple of elmos outside their
--- stamped footprint. The sink (default 0) lowers the stamped
+-- stamped footprint. The clearance (default 16) is the grounded test: a spot
+-- of ground only follows the mesh where the mesh's LOWEST surface is within
+-- that many elmos of it, so an arch's passage, a bridge deck's underside or a
+-- roof on pillars stays open ground while the pillars still raise it. The
+-- sink (default 0) lowers the stamped
 -- ground below the mesh surface; the depth tie between the plateau and the top
 -- face is resolved on the render side instead (cus_gl4 draws the terrainmesh
 -- bin with a polygon offset), so units stand exactly on the model.
@@ -141,7 +145,27 @@ for defID, def in pairs(FeatureDefs) do
 		-- coverage is sampled every half cell; round the reach up to that
 		inset = ceil(inset / (SQ / 2)) * (SQ / 2)
 		local sink = tonumber(cp.terrainmesh_sink) or 0
-		meshDefs[defID] = { inset = inset, sink = sink, name = def.name }
+		local clearance = tonumber(cp.terrainmesh_clearance) or 16
+		-- terrainmesh_cap = "x1 z1 x2 z2 cap[; x1 z1 x2 z2 cap ...]" in model space:
+		-- inside each rectangle, surfaces higher than cap are ignored, so an arch's
+		-- roof or a hanging lamp does not become ground while the floor and a door
+		-- under it still do. The explicit answer to what no vertical probe can tell:
+		-- a hollow pillar and a roofed passage show the same surfaces from below.
+		local caps = nil
+		if cp.terrainmesh_cap then
+			caps = {}
+			for rect in tostring(cp.terrainmesh_cap):gmatch("[^;]+") do
+				local x1, z1, x2, z2, cap = rect:match("(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)")
+				x1, z1, x2, z2, cap = tonumber(x1), tonumber(z1), tonumber(x2), tonumber(z2), tonumber(cap)
+				if x1 and z1 and x2 and z2 and cap then
+					caps[#caps + 1] = { min(x1, x2), min(z1, z2), max(x1, x2), max(z1, z2), cap }
+				end
+			end
+			if #caps == 0 then
+				caps = nil
+			end
+		end
+		meshDefs[defID] = { inset = inset, sink = sink, clearance = clearance, caps = caps, name = def.name }
 	end
 end
 
@@ -319,7 +343,18 @@ end
 -- Euler convention to get wrong.
 local FINE = SQ / 2 -- coverage sample spacing, elmos
 
-local function rasterize(mesh, px, py, pz, xdx, xdy, xdz, ydx, ydy, ydz, zdx, zdy, zdz, inset)
+local function rasterize(mesh, px, py, pz, xdx, xdy, xdz, ydx, ydy, ydz, zdx, zdy, zdz, inset, clearance, caps)
+	clearance = clearance or 16
+	-- caps need each triangle's lowest model-space height; computed once per mesh
+	local triMinY = mesh.triMinY
+	if caps and not triMinY then
+		triMinY = scratch()
+		local mtris, my = mesh.tris, mesh.vy
+		for t = 1, #mtris - 2, 3 do
+			triMinY[t] = min(my[mtris[t]], my[mtris[t + 1]], my[mtris[t + 2]])
+		end
+		mesh.triMinY = triMinY
+	end
 	local sub = SQ / FINE -- coverage samples per heightmap cell
 	local reach = ceil(inset / FINE) -- samples around a vertex the mesh must also cover
 	local n = #mesh.vx
@@ -361,7 +396,8 @@ local function rasterize(mesh, px, py, pz, xdx, xdy, xdz, ydx, ydy, ydz, zdx, zd
 		return nil
 	end
 	local gw = gx2 - gx1 + 1
-	local cover = scratch() -- flat, max height or nil
+	local cover = scratch() -- flat, max height (upper envelope) or nil
+	local lowest = scratch() -- flat, min height (lower envelope) or nil
 
 	local tris = mesh.tris
 	for t = 1, #tris - 2, 3 do
@@ -369,6 +405,8 @@ local function rasterize(mesh, px, py, pz, xdx, xdy, xdz, ydx, ydy, ydz, zdx, zd
 		local ax, az, bx, bz, cx, cz = wx[a], wz[a], wx[b], wz[b], wx[c], wz[c]
 		local ay, by, cy = wy[a], wy[b], wy[c]
 		local det = (bx - ax) * (cz - az) - (cx - ax) * (bz - az)
+		-- which cap rectangles this triangle is high enough to be dropped by
+		local capMinY = caps and triMinY[t] or nil
 		if abs(det) > 1e-6 then
 			local invDet = 1 / det
 			local tx1 = max(gx1, floor(min(ax, bx, cx) / FINE))
@@ -384,15 +422,48 @@ local function rasterize(mesh, px, py, pz, xdx, xdy, xdz, ydx, ydy, ydz, zdx, zd
 					local l1 = ((bx - pxw) * (cz - pzw) - (cx - pxw) * (bz - pzw)) * invDet
 					local l2 = ((cx - pxw) * (az - pzw) - (ax - pxw) * (cz - pzw)) * invDet
 					local l3 = 1 - l1 - l2
-					if l1 >= -1e-4 and l2 >= -1e-4 and l3 >= -1e-4 then
+					local capped = false
+					if capMinY and l1 >= -1e-4 and l2 >= -1e-4 and l3 >= -1e-4 then
+						-- sample position in model space (inverse rotation, ground-plane height)
+						local dx, dz = pxw - px, pzw - pz
+						local mx = xdx * dx + xdz * dz
+						local mz = zdx * dx + zdz * dz
+						for ci = 1, #caps do
+							local r = caps[ci]
+							if mx >= r[1] and mx <= r[3] and mz >= r[2] and mz <= r[4] and capMinY > r[5] then
+								capped = true
+								break
+							end
+						end
+					end
+					if not capped and l1 >= -1e-4 and l2 >= -1e-4 and l3 >= -1e-4 then
 						local h = l1 * ay + l2 * by + l3 * cy
 						local idx = row + (gx - gx1) + 1
 						local old = cover[idx]
 						if not old or h > old then
 							cover[idx] = h
 						end
+						local oldLow = lowest[idx]
+						if not oldLow or h < oldLow then
+							lowest[idx] = h
+						end
 					end
 				end
+			end
+		end
+	end
+
+	-- grounded test: a sample only counts where the mesh's lowest surface is
+	-- within `clearance` of the ground there, so the passage under an arch or
+	-- a bridge stays open while pillars and walls raise the ground
+	for gz = gz1, gz2 do
+		local row = (gz - gz1) * gw
+		local zw = gz * FINE
+		for gx = gx1, gx2 do
+			local idx = row + (gx - gx1) + 1
+			local low = lowest[idx]
+			if low and low > spGetGroundHeight(gx * FINE, zw) + clearance then
+				cover[idx] = nil
 			end
 		end
 	end
@@ -698,7 +769,24 @@ local function computeStamp(fid)
 	if not t then
 		return nil
 	end
-	local r = rasterize(mesh, t[1], t[2], t[3], t[4], t[5], t[6], t[7], t[8], t[9], t[10], t[11], t[12], info.inset)
+	local r = rasterize(
+		mesh,
+		t[1],
+		t[2],
+		t[3],
+		t[4],
+		t[5],
+		t[6],
+		t[7],
+		t[8],
+		t[9],
+		t[10],
+		t[11],
+		t[12],
+		info.inset,
+		info.clearance,
+		info.caps
+	)
 	if not r then
 		return nil
 	end
