@@ -9,11 +9,14 @@
 --
 --   customparams.terrainmesh        "1" opts the def in
 --   customparams.terrainmesh_inset  elmos the mesh must cover past a heightmap
---                                   vertex before that vertex is raised; keeps
---                                   the terrain's slope up to the top inside
---                                   the side walls (default 4 = half a cell).
---                                   Models should carry a skirt below their
---                                   origin for the same reason.
+--                                   vertex before that vertex is raised
+--                                   (default and floor: 8, one cell). The
+--                                   terrain climbs to the top over the cell
+--                                   after the last raised vertex, so the foot
+--                                   of the climb sits inset - 8 elmos inside
+--                                   the wall; keep the walls a couple of elmos
+--                                   outside the stamped footprint and carry a
+--                                   skirt below the origin.
 --   customparams.terrainmesh_sink   elmos the stamped ground sits below the
 --                                   mesh surface (default 0). Not needed for
 --                                   the depth tie with the top face: cus_gl4
@@ -55,7 +58,6 @@ local block = {
 		category = "structures",
 		set = "terraformbrush",
 		terrainmesh = "1",
-		terrainmesh_inset = "4",
 		normalmaps = "yes",
 		normaltex = "unittextures/tf_concrete_block_normal.png",
 		cuspbr = "yes",

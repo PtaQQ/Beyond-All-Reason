@@ -391,10 +391,14 @@ other tags), and `luarules/gadgets/cmd_terrain_mesh.lua` reads the geometry
 straight from the model file, rasterises the upper envelope of its triangles at
 the feature's live transform (`GetFeatureDirection` hands back the engine's own
 matrix columns, so no Euler convention is involved) and stamps it. Models
-should carry a skirt below their origin, and `terrainmesh_inset` (default 4
-elmos, half a heightmap cell) only raises a vertex when the mesh also covers
-that much ground around it, which keeps the terrain's climb up to the top
-surface inside the side walls.
+should carry a skirt below their origin, and `terrainmesh_inset` (default and
+floor 8 elmos, one heightmap cell) only raises a vertex when the mesh also
+covers that much ground around it. The terrain climbs to the top over the one
+cell after the last raised vertex, so the foot of that climb sits `inset - 8`
+elmos inside the wall; a half-cell inset put it outside for any mesh not
+aligned to the 8-elmo grid, a berm climbing half the wall. Keep a model's
+walls a couple of elmos outside its stamped footprint (the block's base is
+132 elmos for a 128-elmo stamp).
 
 The raised plateau sits exactly on the model's top face, so the two would
 z-fight. The CUS GL4 gadget gives terrain meshes their own uniform bin

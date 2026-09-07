@@ -88,7 +88,7 @@ local HEIGHT_EPSILON = 0.05 -- reconcile tolerance, elmos
 local RECONCILE_BUDGET = 1500 -- height samples per frame
 local TRANSFORM_CHECK_PERIOD = 10 -- frames
 
-local floor, max, min, abs = math.floor, math.max, math.min, math.abs
+local floor, ceil, max, min, abs = math.floor, math.ceil, math.max, math.min, math.abs
 local huge = math.huge
 
 local spGetGroundHeight = Spring.GetGroundHeight
@@ -119,9 +119,13 @@ end
 -- Defs
 ----------------------------------------------------------------
 -- defID -> { inset = elmos, sink = elmos }. The inset is how far past a vertex
--- the mesh must also cover before that vertex is raised: with the default half
--- cell, the terrain slope up to the top surface lands INSIDE the mesh's side
--- walls instead of poking out of them. The sink (default 0) lowers the stamped
+-- the mesh must also cover before that vertex is raised. The terrain climbs to
+-- the top over the one cell after the last raised vertex, so the foot of that
+-- climb sits (inset - SQ) elmos inside the wall: anything under a full cell
+-- puts it OUTSIDE for a mesh that is not grid-aligned, a berm climbing up to
+-- half the wall (seen 2026-09-07 with the old half-cell default), so one cell
+-- is the floor and models keep their walls a couple of elmos outside their
+-- stamped footprint. The sink (default 0) lowers the stamped
 -- ground below the mesh surface; the depth tie between the plateau and the top
 -- face is resolved on the render side instead (cus_gl4 draws the terrainmesh
 -- bin with a polygon offset), so units stand exactly on the model.
@@ -130,17 +134,12 @@ local meshDefs = {} -- defID -> { inset = elmos, name = defName }
 for defID, def in pairs(FeatureDefs) do
 	local cp = def.customParams
 	if cp and cp.terrainmesh and cp.terrainmesh ~= "0" and cp.terrainmesh ~= "false" then
-		local inset = tonumber(cp.terrainmesh_inset) or SQ / 2
-		-- the coverage grid is SQ / inset samples per heightmap cell, so keep it integral
-		if inset >= SQ then
+		local inset = tonumber(cp.terrainmesh_inset) or SQ
+		if inset < SQ then
 			inset = SQ
-		elseif inset >= SQ / 2 then
-			inset = SQ / 2
-		elseif inset >= SQ / 4 then
-			inset = SQ / 4
-		else
-			inset = SQ / 8
 		end
+		-- coverage is sampled every half cell; round the reach up to that
+		inset = ceil(inset / (SQ / 2)) * (SQ / 2)
 		local sink = tonumber(cp.terrainmesh_sink) or 0
 		meshDefs[defID] = { inset = inset, sink = sink, name = def.name }
 	end
@@ -318,8 +317,11 @@ end
 -- and GetFeatureDirection hands back exactly those three columns (front, then
 -- the X column, then up), so world = pos + X * vx + Y * vy + Z * vz with no
 -- Euler convention to get wrong.
+local FINE = SQ / 2 -- coverage sample spacing, elmos
+
 local function rasterize(mesh, px, py, pz, xdx, xdy, xdz, ydx, ydy, ydz, zdx, zdy, zdz, inset)
-	local sub = SQ / inset -- coverage samples per heightmap cell
+	local sub = SQ / FINE -- coverage samples per heightmap cell
+	local reach = ceil(inset / FINE) -- samples around a vertex the mesh must also cover
 	local n = #mesh.vx
 	---@type table<integer, number>
 	local wx = {}
@@ -350,11 +352,11 @@ local function rasterize(mesh, px, py, pz, xdx, xdy, xdz, ydx, ydy, ydz, zdx, zd
 		end
 	end
 
-	-- coverage grid in fine (inset-spaced) samples, clamped to the map
-	local gx1 = floor(max(0, minX / inset - 1))
-	local gx2 = floor(min(VX_MAX * sub, maxX / inset + 2))
-	local gz1 = floor(max(0, minZ / inset - 1))
-	local gz2 = floor(min(VZ_MAX * sub, maxZ / inset + 2))
+	-- coverage grid in fine samples, clamped to the map
+	local gx1 = floor(max(0, minX / FINE - 1))
+	local gx2 = floor(min(VX_MAX * sub, maxX / FINE + 2))
+	local gz1 = floor(max(0, minZ / FINE - 1))
+	local gz2 = floor(min(VZ_MAX * sub, maxZ / FINE + 2))
 	if gx2 < gx1 or gz2 < gz1 then
 		return nil
 	end
@@ -369,15 +371,15 @@ local function rasterize(mesh, px, py, pz, xdx, xdy, xdz, ydx, ydy, ydz, zdx, zd
 		local det = (bx - ax) * (cz - az) - (cx - ax) * (bz - az)
 		if abs(det) > 1e-6 then
 			local invDet = 1 / det
-			local tx1 = max(gx1, floor(min(ax, bx, cx) / inset))
-			local tx2 = min(gx2, floor(max(ax, bx, cx) / inset) + 1)
-			local tz1 = max(gz1, floor(min(az, bz, cz) / inset))
-			local tz2 = min(gz2, floor(max(az, bz, cz) / inset) + 1)
+			local tx1 = max(gx1, floor(min(ax, bx, cx) / FINE))
+			local tx2 = min(gx2, floor(max(ax, bx, cx) / FINE) + 1)
+			local tz1 = max(gz1, floor(min(az, bz, cz) / FINE))
+			local tz2 = min(gz2, floor(max(az, bz, cz) / FINE) + 1)
 			for gz = tz1, tz2 do
-				local pzw = gz * inset
+				local pzw = gz * FINE
 				local row = (gz - gz1) * gw
 				for gx = tx1, tx2 do
-					local pxw = gx * inset
+					local pxw = gx * FINE
 					-- barycentric with a tolerance so samples on shared edges count
 					local l1 = ((bx - pxw) * (cz - pzw) - (cx - pxw) * (bz - pzw)) * invDet
 					local l2 = ((cx - pxw) * (az - pzw) - (ax - pxw) * (cz - pzw)) * invDet
@@ -396,7 +398,7 @@ local function rasterize(mesh, px, py, pz, xdx, xdy, xdz, ydx, ydy, ydz, zdx, zd
 	end
 
 	-- a heightmap vertex is raised when the mesh covers it AND every fine
-	-- sample within +/- inset around it (the whole 3x3 neighbourhood)
+	-- sample within +/- inset around it (the whole (2 reach + 1)^2 block)
 	---@type table<integer, integer>
 	local xs = {}
 	---@type table<integer, integer>
@@ -415,14 +417,14 @@ local function rasterize(mesh, px, py, pz, xdx, xdy, xdz, ydx, ydy, ydz, zdx, zd
 			local center = cover[(gz - gz1) * gw + (gx - gx1) + 1]
 			if center then
 				local ok = true
-				for dz = -1, 1 do
+				for dz = -reach, reach do
 					local z = gz + dz
 					if z < gz1 or z > gz2 then
 						ok = false
 						break
 					end
 					local row = (z - gz1) * gw
-					for dx = -1, 1 do
+					for dx = -reach, reach do
 						local x = gx + dx
 						if x < gx1 or x > gx2 or not cover[row + (x - gx1) + 1] then
 							ok = false
