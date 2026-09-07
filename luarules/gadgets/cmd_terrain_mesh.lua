@@ -909,7 +909,7 @@ function gadget:GameFrame(frame)
 	end
 end
 
--- Test hooks (offline harness only; nothing in the game sets the global).
-if rawget(_G, "TerrainMeshHarness") then
-	GG.TerrainMeshTest = { parseS3O = parseS3O, rasterize = rasterize }
-end
+-- Test hooks for the offline harness (tools/tf_mesh_harness.lua); nothing in
+-- the game reads them. Unconditional: the synced sandbox has no rawget to
+-- gate on, and two function references in GG cost nothing.
+GG.TerrainMeshTest = { parseS3O = parseS3O, rasterize = rasterize }
