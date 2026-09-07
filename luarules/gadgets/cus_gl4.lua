@@ -244,10 +244,6 @@ local objectDefToUniformBin = {} -- maps unitDefID/featuredefID to a uniform bin
 -- objectDefs are negative for features
 -- objectIDs are negative for features too
 
----Maps an object definition to the uniform bin its draw call belongs to.
----@param objectDefID (UnitDefID|-FeatureDefID)? Positive for unitDefIDs, negative for featureDefIDs.
----@param reason string? Label used in debug output when no bin is found.
----@return string uniformBinID Falls back to `'otherunit'` for unmapped definitions.
 local function GetUniformBinID(objectDefID, reason)
 	if objectDefID and objectDefToUniformBin[objectDefID] then
 		return objectDefToUniformBin[objectDefID]
@@ -491,9 +487,7 @@ local unitDrawBins = nil -- this also controls whether cusgl4 is on at all!
 
 local objectIDtoDefID = {}
 
----Compiled shaders, keyed by draw flag and then by material name.
----@type table<integer, table<string, LuaShader>>
-local shaders = {}
+local shaders = {} -- double nested table of {drawflag : {"units":shaderID}}
 
 local modelsVertexVBO = nil
 local modelsIndexVBO = nil
@@ -504,6 +498,10 @@ local objectTypeAttribID = 6 -- this is the attribute index for instancedata in 
 
 local initiated = false
 
+local function Bit(p)
+	return 2 ^ (p - 1) -- 1-based indexing
+end
+
 -- Typical call:  if hasbit(x, bit(3)) then ...
 local function HasBit(x, p)
 	return x % (p + p) >= p
@@ -512,6 +510,14 @@ end
 local math_bit_and = math.bit_and
 local function HasAllBits(x, p)
 	return math_bit_and(x, p) == p
+end
+
+local function SetBit(x, p)
+	return HasBit(x, p) and x or x + p
+end
+
+local function ClearBit(x, p)
+	return HasBit(x, p) and x - p or x
 end
 
 -- Precomputed bin membership for every possible drawFlag below 128 (the icon threshold).
@@ -553,10 +559,6 @@ end
 local featuresDefsWithAlpha = {}
 local unitDefsUseSkinning = {}
 
----Returns the compiled shader used to draw an object in a given draw pass.
----@param drawPass integer Draw flag of the current pass.
----@param objectDefID (UnitDefID|-FeatureDefID)? Positive for unitDefIDs, negative for featureDefIDs.
----@return LuaShader|false shader `false` when `objectDefID` is `nil`.
 local function GetShader(drawPass, objectDefID)
 	if objectDefID == nil then
 		return false
@@ -576,10 +578,6 @@ local function GetShader(drawPass, objectDefID)
 	end
 end
 
----Returns the name of the shader used to draw an object in a given draw pass.
----@param drawPass integer Draw flag of the current pass.
----@param objectDefID (UnitDefID|-FeatureDefID)? Positive for unitDefIDs, negative for featureDefIDs.
----@return "unit"|"unitskinning"|"tree"|"feature"|false shaderName `false` when `objectDefID` is `nil`.
 local function GetShaderName(drawPass, objectDefID)
 	-- this function does 2 table lookups, could get away with just one.
 	if objectDefID == nil then
@@ -614,10 +612,6 @@ local function SetFixedStatePost(drawPass, shaderID)
 	end
 end
 
----Uploads the draw pass, clip plane, and uniform bin values to the active shader.
----@param drawPass integer Draw flag of the current pass.
----@param shaderID integer GL program id of the currently bound shader.
----@param uniformBinID string Key into `uniformBins`, as returned by `GetUniformBinID`.
 local function SetShaderUniforms(drawPass, shaderID, uniformBinID)
 	-- Cache uniform locations per-shader to avoid repeated gl.GetUniformLocation calls every frame
 	local locCache = uniformLocCache[shaderID]
@@ -840,6 +834,12 @@ local DEFAULT_VERSION = [[#version 430 core
 	#extension GL_ARB_shader_storage_buffer_object : require
 	#extension GL_ARB_shading_language_420pack: require
 	]]
+
+local function dumpShaderCodeToFile(defs, src, filename) -- no IO in unsynced gadgets :/
+	local vsfile = io.open("cus_" .. filename .. ".glsl", "w+")
+	vsfile:write(defs .. src)
+	vsfile:close()
+end
 
 local function dumpShaderCodeToInfolog(defs, src, filename) -- no IO in unsynced gadgets :/
 	Spring.Echo(filename)
@@ -1218,7 +1218,7 @@ local function initBinsAndTextures()
 				or (lowercasenormaltex:find("leg_normal") and "unittextures/leg_wreck_normal.dds")
 				or false
 
-			if unitDef.customParams.isscavenger then
+			if unitDef.name:find("_scav", nil, true) then -- it better be a scavenger unit, or ill kill you
 				textureTable[3] = wreckTex1
 				textureTable[4] = wreckTex2
 				textureTable[5] = wreckNormalTex
@@ -1229,7 +1229,7 @@ local function initBinsAndTextures()
 				elseif factionBinTag == "leg" then
 					objectDefToUniformBin[unitDefID] = "legscavenger"
 				end
-			elseif unitDef.customParams.israptor then
+			elseif unitDef.name:find("raptor", nil, true) or unitDef.name:find("raptor_hive", nil, true) then
 				textureTable[5] = wreckAtlases.raptor[1]
 				objectDefToUniformBin[unitDefID] = "raptor"
 				--Spring.Echo("Raptorwreck", textureTable[5])
@@ -2255,6 +2255,10 @@ local function ProcessUnits(units, drawFlags, reason)
 		end
 	end
 end
+local spValidFeatureID = Spring.ValidFeatureID
+local spSetFeatureEngineDrawMask = Spring.SetFeatureEngineDrawMask
+local spSetFeatureNoDraw = Spring.SetFeatureNoDraw
+local spSetFeatureFade = Spring.SetFeatureFade
 
 local function ProcessFeatures(features, drawFlags, reason)
 	local numFeatures = #features
@@ -2433,9 +2437,13 @@ local function ExecuteDrawPass(drawPass)
 						-- hair toward the camera so the top face wins that tie (same sign the
 						-- editor's ground overlays use). Not in the shadow pass: the shadow
 						-- map has its own bias.
-						local offsetBin = (uniformBinID == "terrainmesh") and not HasBit(drawPass, 16)
-						if offsetBin then
-							gl.PolygonOffset(-2, -2)
+						local offsetBin = false
+						if uniformBinID == "terrainmesh" and not HasBit(drawPass, 16) then
+							local po = GG.TerrainMeshOffset -- set by cmd_terrain_mesh.lua (unsynced)
+							if po and (po[1] ~= 0 or po[2] ~= 0) then
+								gl.PolygonOffset(po[1], po[2])
+								offsetBin = true
+							end
 						end
 
 						for _, texAndObj in pairs(uniformBin) do
@@ -2885,6 +2893,28 @@ function gadget:Shutdown()
 end
 
 local updateframe = 0
+
+local function countbintypes(flagarray)
+	local fwcnt = 0
+	local defcnt = 0
+	local reflcnt = 0
+	local shadcnt = 0
+
+	for i = 1, #flagarray do
+		local flag = flagarray[i]
+		if HasBit(flag, 1) then
+			fwcnt = fwcnt + 1
+			defcnt = defcnt + 1
+		end
+		if HasBit(flag, 4) then
+			reflcnt = reflcnt + 1
+		end
+		if HasBit(flag, 16) then
+			shadcnt = shadcnt + 1
+		end
+	end
+	return fwcnt, defcnt, reflcnt, shadcnt
+end
 
 local destroyedUnitIDs = {} -- maps unitID to drawflag
 local destroyedUnitDrawFlags = {}

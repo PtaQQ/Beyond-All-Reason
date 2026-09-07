@@ -26,12 +26,23 @@ if not gadgetHandler:IsSyncedCode() then
 		return true -- consumed; no other gadget needs the broadcast
 	end
 
+	-- Polygon offset the CUS GL4 gadget applies to the terrainmesh bin (factor,
+	-- units); /luarules tmesh offset F U retunes it live for A/B looks.
+	local function onTerrainMeshOffset(_, factor, units)
+		GG.TerrainMeshOffset = { factor or 0, units or 0 }
+		Spring.Echo(string.format("[Terrain Mesh] polygon offset %.2f %.2f", factor or 0, units or 0))
+		return true
+	end
+
 	function gadget:Initialize()
+		GG.TerrainMeshOffset = GG.TerrainMeshOffset or { -2, -2 }
 		gadgetHandler:AddSyncAction("TerrainMeshChanged", onTerrainMeshChanged)
+		gadgetHandler:AddSyncAction("TerrainMeshOffset", onTerrainMeshOffset)
 	end
 
 	function gadget:Shutdown()
 		gadgetHandler:RemoveSyncAction("TerrainMeshChanged")
+		gadgetHandler:RemoveSyncAction("TerrainMeshOffset")
 	end
 
 	function gadget:DrawWorld()
@@ -770,9 +781,48 @@ local function reapply(stamp)
 	applyHeights(stamp.xs, stamp.zs, stamp.hs, stamp.n)
 end
 
--- /luarules tmesh          status
--- /luarules tmesh restamp  recompute every stamp
+-- /luarules tmesh              status
+-- /luarules tmesh restamp      recompute every stamp
+-- /luarules tmesh probe        heights along the centre row and column of every stamp
+-- /luarules tmesh offset F U   polygon offset for the terrainmesh draw bin
 local function chatTMesh(cmd, line, words, playerID)
+	if words[1] == "probe" then
+		for i = 1, #stamps do
+			local s = stamps[i]
+			local t = s.transform
+			local cx = floor((s.x1 + s.x2) / 2)
+			local cz = floor((s.z1 + s.z2) / 2)
+			spEcho(
+				string.format(
+					"[Terrain Mesh] probe #%d fid %d pos %.1f %.1f %.1f verts x %d..%d z %d..%d (%d raised)",
+					i,
+					s.fid,
+					t[1],
+					t[2],
+					t[3],
+					s.x1 * SQ,
+					s.x2 * SQ,
+					s.z1 * SQ,
+					s.z2 * SQ,
+					s.n
+				)
+			)
+			local row, col = {}, {}
+			for vx = s.x1 - 3, s.x2 + 3 do
+				row[#row + 1] = string.format("%d:%.1f", vx * SQ, spGetGroundHeight(vx * SQ, cz * SQ))
+			end
+			for vz = s.z1 - 3, s.z2 + 3 do
+				col[#col + 1] = string.format("%d:%.1f", vz * SQ, spGetGroundHeight(cx * SQ, vz * SQ))
+			end
+			spEcho("[Terrain Mesh]   row z=" .. (cz * SQ) .. ": " .. table.concat(row, " "))
+			spEcho("[Terrain Mesh]   col x=" .. (cx * SQ) .. ": " .. table.concat(col, " "))
+		end
+		return true
+	end
+	if words[1] == "offset" then
+		spSendToUnsynced("TerrainMeshOffset", tonumber(words[2]) or 0, tonumber(words[3]) or 0)
+		return true
+	end
 	if words[1] == "restamp" then
 		if not Spring.IsCheatingEnabled() then
 			spEcho("[Terrain Mesh] restamp requires /cheat")
