@@ -155,8 +155,8 @@ for defID, def in pairs(FeatureDefs) do
 		if cp.terrainmesh_cap then
 			caps = {}
 			for rect in tostring(cp.terrainmesh_cap):gmatch("[^;]+") do
-				local x1, z1, x2, z2, cap = rect:match("(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)")
-				x1, z1, x2, z2, cap = tonumber(x1), tonumber(z1), tonumber(x2), tonumber(z2), tonumber(cap)
+				local sx1, sz1, sx2, sz2, scap = rect:match("(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)")
+				local x1, z1, x2, z2, cap = tonumber(sx1), tonumber(sz1), tonumber(sx2), tonumber(sz2), tonumber(scap)
 				if x1 and z1 and x2 and z2 and cap then
 					caps[#caps + 1] = { min(x1, x2), min(z1, z2), max(x1, x2), max(z1, z2), cap }
 				end

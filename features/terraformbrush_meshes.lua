@@ -79,7 +79,7 @@ local block = {
 -- collision, and a bounding box would swallow shots crossing the gate's
 -- passage or the city's streets.
 
-local function converted(name, description, object, author, credit, footX, footZ, height, midY)
+local function converted(name, description, object, author, credit, footX, footZ, height)
 	return {
 		name = name,
 		description = description,
@@ -124,8 +124,7 @@ local gate = converted(
 	"Sci Fi Gate for shooting games Low poly by Free Models., CC-BY-4.0",
 	9,
 	5,
-	51,
-	25.5
+	51
 )
 -- the passage: the model's floor slab runs under the arch, so only a cap keeps the
 -- roof (and the lamp hanging at 27 elmos) from becoming ground; the floor and the
@@ -140,8 +139,7 @@ local city = converted(
 	"Cyberpunk city by Pasha, CC-BY-4.0",
 	128,
 	136,
-	299,
-	86
+	299
 )
 
 return { [block.name] = block, [gate.name] = gate, [city.name] = city }
