@@ -444,8 +444,8 @@ would, so a footprint can be checked before a game is started. The Structures
 category ships two such conversions as examples, both CC-BY-4.0 with the
 credit lines in `features/terraformbrush_meshes.lua`: the Sci-Fi Gate (Free
 Models., 1088 triangles, atlas) and the Cyberpunk City (Pasha, 289k triangles,
-2048 elmos wide, single tiled texture; the 17 MB model is a stress test as
-much as an asset).
+about 3550 elmos wide at scale 0.1917, single tiled texture; the 17 MB model
+is a stress test as much as an asset: its stamp pins 157k vertices).
 
 Overlapping meshes stack in placement order; removing one unwinds the stamps
 above it and re-applies them. A mesh whose ground is not known to be real (a
