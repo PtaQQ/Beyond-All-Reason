@@ -344,6 +344,7 @@ end
 -- the X column, then up), so world = pos + X * vx + Y * vy + Z * vz with no
 -- Euler convention to get wrong.
 local FINE = SQ / 2 -- coverage sample spacing, elmos
+local FINE_CELL_CAP = 1200000 -- above this many coverage cells, sample per vertex instead
 
 local function rasterize(mesh, px, py, pz, xdx, xdy, xdz, ydx, ydy, ydz, zdx, zdy, zdz, inset, clearance, caps)
 	clearance = clearance or 16
@@ -357,8 +358,9 @@ local function rasterize(mesh, px, py, pz, xdx, xdy, xdz, ydx, ydy, ydz, zdx, zd
 		end
 		mesh.triMinY = triMinY
 	end
-	local sub = SQ / FINE -- coverage samples per heightmap cell
-	local reach = ceil(inset / FINE) -- samples around a vertex the mesh must also cover
+	local fine = FINE
+	local sub = SQ / fine -- coverage samples per heightmap cell
+	local reach = ceil(inset / fine) -- samples around a vertex the mesh must also cover
 	local n = #mesh.vx
 	---@type table<integer, number>
 	local wx = {}
@@ -390,13 +392,25 @@ local function rasterize(mesh, px, py, pz, xdx, xdy, xdz, ydx, ydy, ydz, zdx, zd
 	end
 
 	-- coverage grid in fine samples, clamped to the map
-	local gx1 = floor(max(0, minX / FINE - 1))
 	-- the map's last vertex row/column is never stamped: Spring.GetGroundHeight
 	-- clamps to mapSize - 1 there and interpolates, so a raised edge vertex
 	-- could never read back as itself and the reconcile would fight forever
-	local gx2 = floor(min((VX_MAX - 1) * sub, maxX / FINE + 2))
-	local gz1 = floor(max(0, minZ / FINE - 1))
-	local gz2 = floor(min((VZ_MAX - 1) * sub, maxZ / FINE + 2))
+	local gx1 = floor(max(0, minX / fine - 1))
+	local gx2 = floor(min((VX_MAX - 1) * sub, maxX / fine + 2))
+	local gz1 = floor(max(0, minZ / fine - 1))
+	local gz2 = floor(min((VZ_MAX - 1) * sub, maxZ / fine + 2))
+	-- a city-sized footprint at half-cell sampling is millions of cells of
+	-- Lua tables; past the cap, sample at the vertices themselves (the inset
+	-- reach rounds up to whole cells, so the climb still stays inside the walls)
+	if (gx2 - gx1 + 1) * (gz2 - gz1 + 1) > FINE_CELL_CAP and fine < SQ then
+		fine = SQ
+		sub = 1
+		reach = ceil(inset / fine)
+		gx1 = floor(max(0, minX / fine - 1))
+		gx2 = floor(min(VX_MAX - 1, maxX / fine + 2))
+		gz1 = floor(max(0, minZ / fine - 1))
+		gz2 = floor(min(VZ_MAX - 1, maxZ / fine + 2))
+	end
 	if gx2 < gx1 or gz2 < gz1 then
 		return nil
 	end
@@ -414,15 +428,15 @@ local function rasterize(mesh, px, py, pz, xdx, xdy, xdz, ydx, ydy, ydz, zdx, zd
 		local capMinY = caps and triMinY[t] or nil
 		if abs(det) > 1e-6 then
 			local invDet = 1 / det
-			local tx1 = max(gx1, floor(min(ax, bx, cx) / FINE))
-			local tx2 = min(gx2, floor(max(ax, bx, cx) / FINE) + 1)
-			local tz1 = max(gz1, floor(min(az, bz, cz) / FINE))
-			local tz2 = min(gz2, floor(max(az, bz, cz) / FINE) + 1)
+			local tx1 = max(gx1, floor(min(ax, bx, cx) / fine))
+			local tx2 = min(gx2, floor(max(ax, bx, cx) / fine) + 1)
+			local tz1 = max(gz1, floor(min(az, bz, cz) / fine))
+			local tz2 = min(gz2, floor(max(az, bz, cz) / fine) + 1)
 			for gz = tz1, tz2 do
-				local pzw = gz * FINE
+				local pzw = gz * fine
 				local row = (gz - gz1) * gw
 				for gx = tx1, tx2 do
-					local pxw = gx * FINE
+					local pxw = gx * fine
 					-- barycentric with a tolerance so samples on shared edges count
 					local l1 = ((bx - pxw) * (cz - pzw) - (cx - pxw) * (bz - pzw)) * invDet
 					local l2 = ((cx - pxw) * (az - pzw) - (ax - pxw) * (cz - pzw)) * invDet
@@ -612,7 +626,9 @@ local function relaxFill(stamp)
 	for i = 1, n do
 		h[cells[i]] = seed
 	end
-	local iters = min(500, 4 * max(w, hgt))
+	-- bounded work: a city-sized untrusted stamp would otherwise spend half a
+	-- minute here on removal; a coarse membrane is fine under a model that big
+	local iters = min(500, 4 * max(w, hgt), max(8, floor(20000000 / max(n, 1))))
 	for _ = 1, iters do
 		for i = 1, n do
 			local idx = cells[i]

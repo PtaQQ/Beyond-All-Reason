@@ -137,9 +137,9 @@ local city = converted(
 	"terraformbrush/tf_cyberpunk_city.s3o",
 	"Pasha (Sketchfab)",
 	"Cyberpunk city by Pasha, CC-BY-4.0",
-	222,
-	236,
-	518
+	384,
+	408,
+	897
 )
 
 return { [block.name] = block, [gate.name] = gate, [city.name] = city }
