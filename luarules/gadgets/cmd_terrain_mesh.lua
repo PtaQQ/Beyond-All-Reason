@@ -11,7 +11,36 @@ function gadget:GetInfo()
 end
 
 if not gadgetHandler:IsSyncedCode() then
-	return false
+	-- Unsynced half. The ground drawer only re-tessellates on request, so a
+	-- synced stamp leaves the old, coarser triangulation lying across the new
+	-- cliff: its slope then spans more than the heightmap's one cell and pokes
+	-- out of the mesh's walls. The terraform brush forces the refresh after its
+	-- own edits; this does the same for a few draw frames after every stamp,
+	-- shadow mesh included.
+	local TESS_DIRTY_FRAMES = 12
+	local tessDirtyFrames = 0
+	local spForceTesselationUpdate = Spring.ForceTesselationUpdate
+
+	local function onTerrainMeshChanged()
+		tessDirtyFrames = TESS_DIRTY_FRAMES
+	end
+
+	function gadget:Initialize()
+		gadgetHandler:AddSyncAction("TerrainMeshChanged", onTerrainMeshChanged)
+	end
+
+	function gadget:Shutdown()
+		gadgetHandler:RemoveSyncAction("TerrainMeshChanged")
+	end
+
+	function gadget:DrawWorld()
+		if tessDirtyFrames > 0 then
+			spForceTesselationUpdate(true, true)
+			tessDirtyFrames = tessDirtyFrames - 1
+		end
+	end
+
+	return
 end
 
 -- A terrain mesh is an ordinary feature (placed, moved, tilted, lifted and
@@ -65,6 +94,7 @@ local spGetTerrainTypeData = Spring.GetTerrainTypeData
 ---@type fun(typeIndex: integer, tankSpeed: number, kbotSpeed: number, hoverSpeed: number, shipSpeed: number, hardness: number, receiveTracks: boolean, name: string): boolean?
 local spSetTerrainTypeData = Spring.SetTerrainTypeData
 local spEcho = Spring.Echo
+local spSendToUnsynced = SendToUnsynced
 
 -- Scratch tables indexed with computed keys in hot loops: the analyzer's index
 -- typing has no stable answer for those, so it is handed `any`.
@@ -427,6 +457,8 @@ local function applyHeights(xs, zs, hs, n)
 	pendXs, pendZs, pendHs, pendN = xs, zs, hs, n
 	spSetHeightMapFunc(applyWorker)
 	pendXs, pendZs, pendHs, pendN = {}, {}, {}, 0
+	-- the unsynced half re-tessellates the ground drawer for a few frames
+	spSendToUnsynced("TerrainMeshChanged")
 end
 
 local function readHeights(xs, zs, n)
