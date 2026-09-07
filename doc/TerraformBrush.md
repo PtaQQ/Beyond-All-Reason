@@ -394,10 +394,16 @@ matrix columns, so no Euler convention is involved) and stamps it. Models
 should carry a skirt below their origin, and `terrainmesh_inset` (default 4
 elmos, half a heightmap cell) only raises a vertex when the mesh also covers
 that much ground around it, which keeps the terrain's climb up to the top
-surface inside the side walls. `terrainmesh_sink` (default 3 elmos) stamps the
-ground that far below the mesh surface: a plateau exactly on the top face
-z-fights with it as the camera moves, and units standing three elmos inside
-the model are invisible.
+surface inside the side walls.
+
+The raised plateau sits exactly on the model's top face, so the two would
+z-fight. The CUS GL4 gadget gives terrain meshes their own uniform bin
+(`terrainmesh`, PBR like `featurepbr`) and draws it with
+`gl.PolygonOffset(-2, -2)` in the forward and deferred passes: a hair of depth
+toward the camera, enough to win the tie against the ground it sits on and
+nothing more, so a hill in front still occludes it and units stand exactly on
+the model. `terrainmesh_sink` (default 0) can still stamp the ground below the
+surface for models that want it.
 
 Why the feature is pinned with `SetFeatureMoveCtrl(enabled = true)` and zero
 vectors rather than the masks-only lock used for lifted features:

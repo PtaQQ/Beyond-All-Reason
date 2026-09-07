@@ -79,10 +79,10 @@ end
 -- defID -> { inset = elmos, sink = elmos }. The inset is how far past a vertex
 -- the mesh must also cover before that vertex is raised: with the default half
 -- cell, the terrain slope up to the top surface lands INSIDE the mesh's side
--- walls instead of poking out of them. The sink lowers the stamped ground below
--- the mesh surface so the two never share a depth (a plateau exactly on the
--- top face z-fights with it as the camera moves); three elmos hold at any zoom
--- and units standing that deep inside the model are invisible.
+-- walls instead of poking out of them. The sink (default 0) lowers the stamped
+-- ground below the mesh surface; the depth tie between the plateau and the top
+-- face is resolved on the render side instead (cus_gl4 draws the terrainmesh
+-- bin with a polygon offset), so units stand exactly on the model.
 ---@type table
 local meshDefs = {} -- defID -> { inset = elmos, name = defName }
 for defID, def in pairs(FeatureDefs) do
@@ -99,7 +99,7 @@ for defID, def in pairs(FeatureDefs) do
 		else
 			inset = SQ / 8
 		end
-		local sink = tonumber(cp.terrainmesh_sink) or 3
+		local sink = tonumber(cp.terrainmesh_sink) or 0
 		meshDefs[defID] = { inset = inset, sink = sink, name = def.name }
 	end
 end

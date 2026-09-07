@@ -391,6 +391,15 @@ do --save a ton of locals
 			baseVertexDisplacement = 0.0,
 			brightnessFactor = 1.3,
 		},
+		-- Terrain meshes (cmd_terrain_mesh.lua): featurepbr, but drawn with a polygon
+		-- offset (ExecuteDrawPass) so the model wins the depth tie against the ground
+		-- stamped onto its top face. A hill in front still occludes it: the offset is
+		-- a hair of depth, not a draw-order override.
+		terrainmesh = {
+			bitOptions = defaultBitShaderOptions,
+			baseVertexDisplacement = 0.0,
+			brightnessFactor = 1.3,
+		},
 		treepbr = {
 			bitOptions = defaultBitShaderOptions + OPTION_TREEWIND + OPTION_PBROVERRIDE,
 			baseVertexDisplacement = 0.0,
@@ -1138,6 +1147,8 @@ local function initBinsAndTextures()
 				featuresDefsWithAlpha[-1 * featureDefID] = "yes"
 			elseif featureDef.name:find("_dead", nil, true) or featureDef.name:find("_heap", nil, true) then
 				objectDefToUniformBin[-1 * featureDefID] = "wreck"
+			elseif featureDef.customParams and featureDef.customParams.terrainmesh then
+				objectDefToUniformBin[-1 * featureDefID] = "terrainmesh"
 			elseif
 				featureDef.name:find("pilha_crystal", nil, true)
 				or (featureDef.customParams and featureDef.customParams.cuspbr)
@@ -2418,6 +2429,15 @@ local function ExecuteDrawPass(drawPass)
 					if (uniformBinObjectCounts[uniformBin] or 0) > 0 then
 						SetShaderUniforms(drawPass, shaderTable.shaderObj, uniformBinID)
 
+						-- terrain meshes sit exactly on the ground they raised; pull them a
+						-- hair toward the camera so the top face wins that tie (same sign the
+						-- editor's ground overlays use). Not in the shadow pass: the shadow
+						-- map has its own bias.
+						local offsetBin = (uniformBinID == "terrainmesh") and not HasBit(drawPass, 16)
+						if offsetBin then
+							gl.PolygonOffset(-2, -2)
+						end
+
 						for _, texAndObj in pairs(uniformBin) do
 							if texAndObj.numobjects > 0 then
 								batches = batches + 1
@@ -2444,6 +2464,9 @@ local function ExecuteDrawPass(drawPass)
 									tracy.ZoneEnd()
 								end
 							end
+						end
+						if offsetBin then
+							gl.PolygonOffset(false)
 						end
 					end
 				end
@@ -3114,7 +3137,7 @@ function gadget:DrawWorldPreUnit()
 	tracy.ZoneEnd()
 end
 
-local nightFactorBins = { tree = 1.3, feature = 1.3, featurepbr = 1.3, treepbr = 1.3 }
+local nightFactorBins = { tree = 1.3, feature = 1.3, featurepbr = 1.3, treepbr = 1.3, terrainmesh = 1.3 }
 local lastSunChanged = -1
 function gadget:SunChanged() -- Note that map_nightmode.lua gadget has to change sun twice in a single draw frame to update all
 	local df = Spring.GetDrawFrame()
