@@ -23,6 +23,7 @@ if not gadgetHandler:IsSyncedCode() then
 
 	local function onTerrainMeshChanged()
 		tessDirtyFrames = TESS_DIRTY_FRAMES
+		return true -- consumed; no other gadget needs the broadcast
 	end
 
 	function gadget:Initialize()
