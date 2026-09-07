@@ -284,6 +284,28 @@ end
 -- the height it was given. Deliberately not unlocked again if it later returns
 -- to the ground: this is authored scenery, and staying put is what the author
 -- asked for.
+-- Terrain meshes (cmd_terrain_mesh.lua) own the ground under them; the placer
+-- hands them their final transform through this API. Read per call: the API
+-- is installed at runtime, and typed as a maybe-table so the analyzer does
+-- not fold the guards.
+local function terrainMeshAPI()
+	---@type table?
+	local api = GG.TerrainMesh
+	return api
+end
+
+local function isTerrainMesh(featureID)
+	local api = terrainMeshAPI()
+	return api ~= nil and api.isMeshFeature(featureID) == true
+end
+
+local function touchTerrainMesh(featureID, trustGround)
+	local api = terrainMeshAPI()
+	if api ~= nil then
+		api.touch(featureID, trustGround)
+	end
+end
+
 local function lockFeatureInPlace(featureID)
 	if SetFeatureMoveCtrl then
 		SetFeatureMoveCtrl(featureID, false, 0, 0, 0, 0, 0, 0, 0, 0, 0)
@@ -309,12 +331,16 @@ local function applyTransform(featureID, t)
 	-- restore the pre-transform orientation when it finished.
 	wobbleQueue[featureID] = nil
 
-	if t.y > GetGroundHeight(t.x, t.z) + LIFT_EPSILON then
+	local terrainMesh = isTerrainMesh(featureID)
+	if not terrainMesh and t.y > GetGroundHeight(t.x, t.z) + LIFT_EPSILON then
 		lockFeatureInPlace(featureID)
 	end
 
 	SetFeaturePosition(featureID, t.x, t.y, t.z)
 	SetFeatureRotation(featureID, t.pitch, t.yaw, t.roll)
+	if terrainMesh then
+		touchTerrainMesh(featureID, true)
+	end
 	return true
 end
 
@@ -368,14 +394,21 @@ local function parsePlacement(entry)
 	}
 end
 
-local function createFromPlacement(p)
+local function createFromPlacement(p, trustGround)
 	local id = CreateFeature(p.defName, p.x, p.y, p.z, p.heading, gaiaTeamID)
 	if not id then
 		return nil
 	end
 
+	-- Terrain meshes (cmd_terrain_mesh.lua) are pinned by their own gadget:
+	-- the masks-only lock below would let the engine pop them onto the very
+	-- ground they raise.
+	local terrainMesh = isTerrainMesh(id)
+
 	if p.y > GetGroundHeight(p.x, p.z) + LIFT_EPSILON then
-		lockFeatureInPlace(id)
+		if not terrainMesh then
+			lockFeatureInPlace(id)
+		end
 		SetFeaturePosition(id, p.x, p.y, p.z)
 	end
 
@@ -391,6 +424,12 @@ local function createFromPlacement(p)
 	-- volume gadget among them) fire inside CreateFeature, so scaling here
 	-- multiplies on top of whatever they set rather than being stomped by it.
 	applyFeatureScale(id, p.scale)
+
+	-- Final transform is in: let the ground follow the mesh. trustGround is
+	-- false for project loads, whose heightmap already carries the stamp.
+	if terrainMesh then
+		touchTerrainMesh(id, trustGround ~= false)
+	end
 
 	return id
 end
@@ -445,7 +484,7 @@ local function splitStroke(payload)
 	return strokeID, #strokeID + 2
 end
 
-local function placeFromList(payload, wobble)
+local function placeFromList(payload, wobble, trustGround)
 	local strokeID, bodyStart = splitStroke(payload)
 	local entry = (strokeID ~= "") and openStroke(strokeID, "place", "place") or nil
 	local placed = entry and entry.features or {}
@@ -454,12 +493,13 @@ local function placeFromList(payload, wobble)
 	for chunk in payload:sub(bodyStart):gmatch("[^|]+") do
 		local p = parsePlacement(chunk)
 		if p then
-			local id = createFromPlacement(p)
+			local id = createFromPlacement(p, trustGround)
 			if id then
 				p.id = id
 				placed[#placed + 1] = p
 				count = count + 1
-				if wobble then
+				-- a terrain mesh never wobbles: each frame of tilt would re-stamp the ground
+				if wobble and not isTerrainMesh(id) then
 					addWobble(id)
 				end
 			end
@@ -792,7 +832,9 @@ end
 -- Same wire format as $feature_place_list$; the only difference is that loading
 -- a saved map should not play the placement wobble on every feature at once.
 local function loadFeatureBatch(payload)
-	return placeFromList(payload, false)
+	-- The project's heightmap already carries every terrain mesh's stamp, so
+	-- the ground under a loaded mesh is not what removing it should give back.
+	return placeFromList(payload, false, false)
 end
 
 ----------------------------------------------------------------

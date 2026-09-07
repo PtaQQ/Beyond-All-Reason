@@ -207,6 +207,7 @@ body {
 	white-space: nowrap;
 }
 
+.fp-thumb-structures { background-color: #9ca3af; }
 .fp-thumb-rocks { background-color: #78716c; }
 .fp-thumb-trees { background-color: #4ade80; }
 .fp-thumb-foliage { background-color: #86efac; }

@@ -816,6 +816,7 @@ local function attachEventListeners()
 	-- Category buttons
 	local catKeys = {
 		"all",
+		"structures",
 		"rocks",
 		"trees",
 		"foliage",

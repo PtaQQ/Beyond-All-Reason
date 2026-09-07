@@ -163,6 +163,7 @@ local featureCategories = {} -- { categoryName = { {name=..., id=...}, ... } }
 
 local CATEGORY_ORDER = {
 	"geo",
+	"structures",
 	"rocks",
 	"trees",
 	"foliage",
@@ -177,6 +178,7 @@ local CATEGORY_ORDER = {
 
 local CATEGORY_LABELS = {
 	geo = "Geo",
+	structures = "Structures",
 	rocks = "Rocks",
 	trees = "Trees",
 	foliage = "Foliage",
@@ -195,6 +197,11 @@ local function classifyFeature(name, def)
 	-- and both buried in Other made it easy to place the wrong one.
 	if def and def.geoThermal then
 		return "geo"
+	end
+
+	-- Terrain meshes: models the map's ground follows (cmd_terrain_mesh.lua).
+	if def and def.customParams and def.customParams.terrainmesh then
+		return "structures"
 	end
 
 	-- Exclude debris and heaps entirely

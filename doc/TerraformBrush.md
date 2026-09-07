@@ -368,6 +368,50 @@ Each feature's 3D model is rendered to a 64×64 in-memory GL texture on first op
 
 **Note:** RML `<img src>` only resolves VFS archive paths, not the writeable data directory where `gl.SaveImage` stores files. This is why thumbnails use direct GL texture overlay instead of saved PNGs.
 
+#### Terrain Meshes
+
+A **terrain mesh** is a feature whose model becomes part of the map. Place it,
+move it, rotate, tilt or lift it with every Feature Placer control, and the
+ground under it follows: every heightmap vertex the model covers is set to the
+height of the model's upper surface, so units path and drive over the model
+exactly, its walls stop them by slope the way a cliff does, and a sloped top is
+a ramp. The typemap cells under it switch to a terrain type with hardness 1000
+(`Spring.SetTerrainTypeData` takes hardness as its sixth argument and the
+engine divides crater depth by it), so explosions leave the ground alone, and a
+synced reconcile pins the heights against anything that still moves them, the
+tail of an explosion or a brush stroke under the mesh. Removing the feature
+gives the ground back.
+
+The first asset is the **Concrete Block** in the new Structures category
+(128 x 128 x 48 elmos, generated together with its PBR textures and the
+category icon by `c:/BAR-Github/tools/tf_mesh_block.py`). Any s3o built in a 3D
+package works the same way: a feature def opts in with
+`customparams.terrainmesh = "1"` (`features/terraformbrush_meshes.lua` lists the
+other tags), and `luarules/gadgets/cmd_terrain_mesh.lua` reads the geometry
+straight from the model file, rasterises the upper envelope of its triangles at
+the feature's live transform (`GetFeatureDirection` hands back the engine's own
+matrix columns, so no Euler convention is involved) and stamps it. Models
+should carry a skirt below their origin, and `terrainmesh_inset` (default 4
+elmos, half a heightmap cell) only raises a vertex when the mesh also covers
+that much ground around it, which keeps the terrain's climb up to the top
+surface inside the side walls.
+
+Why the feature is pinned with `SetFeatureMoveCtrl(enabled = true)` and zero
+vectors rather than the masks-only lock used for lifted features:
+`CFeature::UpdatePosition` lifts any feature the ground rises over, unmasked,
+and `CFeatureHandler::TerrainChanged` re-queues every feature in a changed
+area, so a block would pop onto its own top the frame after the stamp and the
+re-stamp would chase it upward forever. The enabled branch never consults the
+ground. Terrain meshes also skip the placement wobble, which would re-stamp
+the ground on every frame of tilt.
+
+Overlapping meshes stack in placement order; removing one unwinds the stamps
+above it and re-applies them. A mesh whose ground is not known to be real (a
+project load, whose heightmap already carries the stamp, or a `/luarules
+reload`) heals the ground on removal by relaxation from the surrounding ring
+instead of restoring a snapshot. `/luarules tmesh` prints the status,
+`/luarules tmesh restamp` recomputes every stamp.
+
 ### Grass Brush
 
 Brush-based grass density painting over the GL4 grass system.
