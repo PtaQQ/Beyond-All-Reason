@@ -389,9 +389,12 @@ local function rasterize(mesh, px, py, pz, xdx, xdy, xdz, ydx, ydy, ydz, zdx, zd
 
 	-- coverage grid in fine samples, clamped to the map
 	local gx1 = floor(max(0, minX / FINE - 1))
-	local gx2 = floor(min(VX_MAX * sub, maxX / FINE + 2))
+	-- the map's last vertex row/column is never stamped: Spring.GetGroundHeight
+	-- clamps to mapSize - 1 there and interpolates, so a raised edge vertex
+	-- could never read back as itself and the reconcile would fight forever
+	local gx2 = floor(min((VX_MAX - 1) * sub, maxX / FINE + 2))
 	local gz1 = floor(max(0, minZ / FINE - 1))
-	local gz2 = floor(min(VZ_MAX * sub, maxZ / FINE + 2))
+	local gz2 = floor(min((VZ_MAX - 1) * sub, maxZ / FINE + 2))
 	if gx2 < gx1 or gz2 < gz1 then
 		return nil
 	end
@@ -865,12 +868,6 @@ local function stampFeature(fid, trustGround)
 	return true
 end
 
--- Cheap re-assert of an existing stamp's heights, for craters and brush strokes
--- that touched the ground under a mesh.
-local function reapply(stamp)
-	applyHeights(stamp.xs, stamp.zs, stamp.hs, stamp.n)
-end
-
 -- /luarules tmesh              status
 -- /luarules tmesh restamp      recompute every stamp
 -- /luarules tmesh probe        heights along the centre row and column of every stamp
@@ -936,6 +933,24 @@ local function chatTMesh(cmd, line, words, playerID)
 	spEcho(
 		string.format("[Terrain Mesh] %d meshes, %d vertices pinned, terrain type %s", #stamps, verts, tostring(hardTT))
 	)
+	spEcho(
+		string.format(
+			"[Terrain Mesh] reconcile: %d fix batches, %d vertices put back, %d drift re-stamps%s",
+			statFixes,
+			statFixVerts,
+			statRestamps,
+			statLastFix
+					and string.format(
+						"; last at (%d, %d) expected %.2f found %.2f on frame %d",
+						statLastFix[1],
+						statLastFix[2],
+						statLastFix[3],
+						statLastFix[4],
+						statLastFix[5]
+					)
+				or ""
+		)
+	)
 	return true
 end
 
@@ -943,6 +958,10 @@ end
 -- Callins
 ----------------------------------------------------------------
 local reconcileStamp, reconcileVert = 1, 1
+-- diagnostics for /luarules tmesh: how often the ground had to be put back and
+-- how often a mesh moved on its own; the first few of each are echoed
+local statFixes, statFixVerts, statRestamps = 0, 0, 0
+local statLastFix = nil -- { x, z, expected, found, frame }
 
 function gadget:Initialize()
 	if not next(meshDefs) then
@@ -1047,6 +1066,17 @@ function gadget:GameFrame(frame)
 			removeStamp(gone[i])
 		end
 		for i = 1, #drifted do
+			statRestamps = statRestamps + 1
+			if statRestamps <= 5 or statRestamps % 100 == 0 then
+				spEcho(
+					string.format(
+						"[Terrain Mesh] frame %d: feature %d moved on its own, re-stamping (%d so far)",
+						frame,
+						drifted[i],
+						statRestamps
+					)
+				)
+			end
 			stampFeature(drifted[i], true)
 		end
 		n = #stamps
@@ -1057,8 +1087,11 @@ function gadget:GameFrame(frame)
 
 	-- Height reconcile: walk the stamps a budget of vertices per frame and
 	-- re-assert any stamp whose ground no longer matches (craters, brush).
+	-- Only the vertices that disagree are put back (one batch per frame), so a
+	-- single stray vertex never re-applies a 50k-vertex stamp.
 	---@type number
 	local budget = RECONCILE_BUDGET
+	local fixXs, fixZs, fixHs, fixN = scratch(), scratch(), scratch(), 0
 	while budget > 0 do
 		if reconcileStamp > n then
 			reconcileStamp, reconcileVert = 1, 1
@@ -1067,20 +1100,17 @@ function gadget:GameFrame(frame)
 		local xs, zs, hs = s.xs, s.zs, s.hs
 		local i = reconcileVert
 		local last = min(s.n, i + budget - 1)
-		local mismatch = false
 		while i <= last do
-			if abs(spGetGroundHeight(xs[i] * SQ, zs[i] * SQ) - hs[i]) > HEIGHT_EPSILON then
-				mismatch = true
-				break
+			local found = spGetGroundHeight(xs[i] * SQ, zs[i] * SQ)
+			if abs(found - hs[i]) > HEIGHT_EPSILON then
+				fixN = fixN + 1
+				fixXs[fixN], fixZs[fixN], fixHs[fixN] = xs[i], zs[i], hs[i]
+				statLastFix = { xs[i] * SQ, zs[i] * SQ, hs[i], found, frame }
 			end
 			i = i + 1
 		end
 		budget = budget - (i - reconcileVert)
-		if mismatch then
-			reapply(s)
-			budget = budget - s.n
-			reconcileStamp, reconcileVert = reconcileStamp + 1, 1
-		elseif i > s.n then
+		if i > s.n then
 			reconcileStamp, reconcileVert = reconcileStamp + 1, 1
 		else
 			reconcileVert = i
@@ -1088,6 +1118,27 @@ function gadget:GameFrame(frame)
 		if reconcileStamp > n and reconcileVert == 1 then
 			-- one full pass done this frame; the rest waits for the next
 			break
+		end
+	end
+	if fixN > 0 then
+		applyHeights(fixXs, fixZs, fixHs, fixN)
+		statFixes = statFixes + 1
+		statFixVerts = statFixVerts + fixN
+		if statFixes <= 5 or statFixes % 100 == 0 then
+			local f = statLastFix
+			spEcho(
+				string.format(
+					"[Terrain Mesh] frame %d: put back %d vertices (batch %d, %d total), e.g. (%d, %d) expected %.2f found %.2f",
+					frame,
+					fixN,
+					statFixes,
+					statFixVerts,
+					f[1],
+					f[2],
+					f[3],
+					f[4]
+				)
+			)
 		end
 	end
 end
