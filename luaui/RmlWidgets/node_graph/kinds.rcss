@@ -1,0 +1,42 @@
+/* ==========================================================================
+   NODE GRAPH: THE LOOK OF EACH NODE KIND, for every graph in the game.
+
+   node_graph.rml links three sheets in order: node_graph.rcss (the base), this file, then
+   node_graph_after.rcss (selected, found, dim, cycle, idle-port and hover states). The states
+   have the same specificity as these rules and win by coming later, which is why a kind's
+   look lives in a file of its own rather than inline or in the base.
+
+   A NEW KIND: copy one kind's nine rules below under a heading for your tool, rename the kind,
+   and keep `#rrggbb` equal to your adapter's `kinds[i].tint` (the wires are graded in it).
+   Kind names are shared by every graph, so make yours distinct (a CEG graph's "emitter" is
+   fine; a second tool's "emitter" would take its colours). A kind with no rules is grey.
+   ========================================================================== */
+
+/* --- the toy CEG graph (adapters/toy_ceg.lua): the template ------------------------------ */
+.ng-node-emitter { border-color: #f77a9d80; decorator: vertical-gradient(#3a1822 #231016); }
+.ng-node-emitter:hover { decorator: vertical-gradient(#4a1f2c #2c141c); }
+.ng-node-emitter .ng-node-title { color: #ffc2d3; }
+.ng-node-emitter .ng-node-titlebar { background-color: #f77a9d24; border-bottom-color: #f77a9d40; }
+.ng-node-emitter .ng-port-dot { background-color: #f77a9d; }
+.ng-node-emitter .ng-node-expand { border-color: #f77a9d70; }
+.ng-graph-minimap-emitter { background-color: #f77a9d; }
+.ng-palette-row-emitter .ng-palette-kind { color: #f77a9d; }
+#ng-find-emitter.active { background-color: #f77a9d; border-color: #f77a9d; }
+.ng-node-spawner { border-color: #8fd46280; decorator: vertical-gradient(#1f3016 #131d0d); }
+.ng-node-spawner:hover { decorator: vertical-gradient(#29401d #192812); }
+.ng-node-spawner .ng-node-title { color: #cdf2b4; }
+.ng-node-spawner .ng-node-titlebar { background-color: #8fd46224; border-bottom-color: #8fd46240; }
+.ng-node-spawner .ng-port-dot { background-color: #8fd462; }
+.ng-node-spawner .ng-node-expand { border-color: #8fd46270; }
+.ng-graph-minimap-spawner { background-color: #8fd462; }
+.ng-palette-row-spawner .ng-palette-kind { color: #8fd462; }
+#ng-find-spawner.active { background-color: #8fd462; border-color: #8fd462; }
+.ng-node-particle { border-color: #e6e9f080; decorator: vertical-gradient(#26272c #18191d); }
+.ng-node-particle:hover { decorator: vertical-gradient(#33353b #202126); }
+.ng-node-particle .ng-node-title { color: #f4f6fa; }
+.ng-node-particle .ng-node-titlebar { background-color: #e6e9f024; border-bottom-color: #e6e9f040; }
+.ng-node-particle .ng-port-dot { background-color: #e6e9f0; }
+.ng-node-particle .ng-node-expand { border-color: #e6e9f070; }
+.ng-graph-minimap-particle { background-color: #e6e9f0; }
+.ng-palette-row-particle .ng-palette-kind { color: #e6e9f0; }
+#ng-find-particle.active { background-color: #e6e9f0; border-color: #e6e9f0; }

@@ -1,0 +1,1265 @@
+/* ==========================================================================
+   NODE GRAPH: the rules that must come AFTER every kind's look (kinds.rcss): the node and
+   wire states, the canvas furniture drawn over them, and the hiding rules. See
+   node_graph.rcss for the whole sheet's notes.
+   ========================================================================== */
+
+.ng-node.hidden { display: none; }
+
+/* Graph search: what matches is picked out, what does not is pushed back. Nothing is
+   hidden, because a node that vanished would take its edges' meaning with it. */
+.ng-node.ng-node-found {
+	border-color: #fdc04c;
+	box-shadow: 0dp 0dp 8dp 0dp #fdc04c60, inset 0dp 1dp 0dp 0dp #ffffff12;
+}
+
+.ng-node.ng-node-dim {
+	border-color: #2a2a34;
+	decorator: vertical-gradient(#1a1a20 #131319);
+}
+
+.ng-node.ng-node-dim .ng-node-title { color: #5a6170; }
+.ng-node.ng-node-dim .ng-node-sub { color: #3f4552; }
+
+/* PX, like the box around it. The font was in `rem`, which is density-scaled, inside a
+   node measured in raw pixels -- so how much of the box the text filled depended on the
+   display, and the fixed row height cropped the descenders when it came out large. Both
+   rows now have a couple of pixels of headroom over their own font size. */
+.ng-node-title {
+	font-size: 20px;
+	font-weight: bold;
+	color: #eef1f6;
+	white-space: nowrap;
+	overflow: hidden;
+	height: 24px;
+}
+
+/* The type. It was #6b7280 against a near-black node, which is under three to one and
+   barely there; the title carries the name, but this is what says what the thing IS. */
+.ng-node-sub {
+	font-size: 16px;
+	color: #99a3b5;
+	white-space: nowrap;
+	overflow: hidden;
+	height: 20px;
+}
+
+/* The type and the caret share a row, so the caret sits at the end of the type rather than
+   below it. Bare text inside a flex element does not draw in this build, which is why the type
+   has a div of its own. */
+.ng-node-subrow {
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	justify-content: space-between;
+}
+
+/* A parameter row: the name, then the value. Collapsed, there is one of these carrying the
+   whole summary; open, there is one per parameter. */
+.ng-node-param {
+	display: flex;
+	flex-direction: row;
+	white-space: nowrap;
+	overflow: hidden;
+}
+
+.ng-node-plabel {
+	color: #c4ccd9;
+	margin-right: 8px;
+}
+
+.ng-node-pvalue {
+	color: #c3cad8;
+	white-space: nowrap;
+	overflow: hidden;
+}
+
+/* The summary line reads as one phrase rather than as a label and a value. */
+.ng-node-summary .ng-node-pvalue { color: #d2d8e2; }
+
+/* The caret that opens a node. Only drawn when the node has parameters to show. */
+.ng-node-caret {
+	color: #7a8396;
+	text-align: center;
+	border-radius: 3dp;
+}
+
+.ng-node-caret:hover {
+	color: #fdc04c;
+	background-color: #ffffff14;
+}
+
+.ng-node-caret-open { color: #c3cad8; }
+
+/* The title is what gets double-clicked to rename, so it says so on hover. Nothing else in
+   the box reacts, which is what keeps the gesture from leaking. */
+.ng-node-title:hover { color: #fdc04c; }
+
+.ng-node-selected {
+	border-color: #fdc04c;
+	box-shadow: 0dp 0dp 10dp 0dp #fdc04c60, inset 0dp 1dp 0dp 0dp #ffffff20;
+	z-index: 3;
+}
+
+/* A node on a cycle. Red, and it pulses, because this is the warning that
+   stops a designer shipping a mission that hangs. */
+.ng-node-cycle {
+	border-color: #ef4444;
+	decorator: vertical-gradient(#331418 #1d0c0f);
+	box-shadow: 0dp 0dp 10dp 0dp #ef444450, inset 0dp 1dp 0dp 0dp #ffffff10;
+	animation: ng-pulse 1.6s infinite;
+}
+
+.ng-node-cycle .ng-node-title { color: #ff9999; }
+
+/* A node whose record is disabled for testing. */
+.ng-node-off {
+	border-color: #3a3a44;
+	decorator: vertical-gradient(#1a1a20 #101014);
+}
+
+.ng-node-off .ng-node-title { color: #565c66; }
+
+/* Corner marker for a node that also carries a warning (dangling reference). */
+/* The dot on a node with a dangling reference. Its box is written inline by the renderer so
+   it scales with the zoom like everything else in the canvas; what is left here is where it
+   sits and what colour it is. */
+.ng-node-flag {
+	position: absolute;
+	right: 5px;
+	bottom: 5px;
+	background-color: #ef4444;
+	z-index: 5;
+}
+
+/* And the box itself, quietly. The dot says which node; the border says it without the
+   designer having to spot a dot on a canvas of eighty boxes. */
+.ng-node-warn { border-color: #ef444488; }
+
+.ng-node-flag.hidden { display: none; }
+
+/* --- edges --------------------------------------------------------------- */
+/* A connector is a CHAIN of these bars laid along a cubic bezier, the way a node
+   editor draws one: it leaves the source horizontally and arrives at the target
+   horizontally, so dragging a node re-shapes it instead of swinging a straight
+   line about. Lua sets left, top, width and `transform: rotateZ(<angle>deg)` on
+   each bar; the origin below is what makes that rotation pivot on the bar's own
+   left end. The bars overlap by a pixel so the joints do not show. */
+/* The bars carry their own colour inline, graded along the connector from the node it
+   leaves to the node it arrives at. What is left here is the fallback and the variants. */
+.ng-edge {
+	position: absolute;
+	/* Both of these are WRITTEN INLINE by the renderer, scaled by the zoom, and the radius has
+	   to be written with the height or the caps stop being round the moment you zoom in. What
+	   is left here is only the fallback for the placeholder markup. */
+	height: 5px;
+	width: 40px;
+	background-color: #59627a;
+	border-radius: 3px;
+	transform-origin: left center;
+	z-index: 1;
+	pointer-events: none;
+}
+
+.ng-edge.hidden { display: none; }
+
+/* Every connector touching the selected node. Brighter, thicker and above the rest, so
+   what a trigger reaches can be read without tracing it. */
+.ng-edge-selected {
+	z-index: 2;
+}
+
+.ng-edge.ng-edge-cycle {
+	background-color: #ef4444;
+	animation: ng-edge-pulse 1.6s infinite;
+}
+
+
+/* Port dot: where a connector leaves or arrives. Drawn after the nodes, so it
+   sits on the node's edge rather than under it, which is what makes a connector
+   read as attached rather than merely adjacent. */
+.ng-port {
+	position: absolute;
+	/* NO background, border or radius. This is the invisible grab strip, not the dot: it runs
+	   the full height of the node down its edge so a connector can be started without anybody
+	   having to hit nine pixels. Everything it used to look like moved to `.ng-port-dot`, and
+	   leaving those declarations here painted a solid grey block over the start of every
+	   title. Its box is written inline by the renderer. */
+	z-index: 4;
+	/* `drag: drag` is what makes a connector pullable off it. The node underneath is draggable
+	   too; RmlUi raises the drag on the innermost one, so the strip wins and the handler stops
+	   the event before the node ever hears about it. A plain CLICK still reaches the node,
+	   which is what keeps the bigger grab area from costing a selection. */
+	drag: drag;
+	cursor: pointer;
+}
+
+.ng-port-in { left: 0px; }
+.ng-port-out { right: 0px; }
+
+/* The dot keeps the outline it always had: a ring of the node's own background, so it reads
+   as sitting ON the edge rather than beside it. */
+.ng-port-dot { border: 1px #12141c; }
+
+/* The visible dot, inside the grab strip. Everything that used to be said about `.ng-port` is
+   said about this instead: the strip itself has no appearance at all, and exists only so that
+   a drag near the node's edge starts a connector without anybody having to hit nine pixels. */
+.ng-port-dot {
+	position: absolute;
+	width: 11px;
+	height: 11px;
+	border-radius: 6px;
+}
+
+/* A port that can hold exactly ONE wire, which is an EnableTrigger's output: it writes a
+   parameter, not a list, so a second connector would replace the first rather than join it.
+   Square, because in every node editor a round port takes many and a square one takes one. */
+.ng-port-single .ng-port-dot { border-radius: 1px; }
+
+/* A port wears its own node's colour, which is the colour the connector leaves in. A kind the
+   stylesheet does not name (another adapter's, stage G2) gets a neutral dot rather than none. */
+.ng-port-dot { background-color: #aeb6c4; }
+
+/* A port with nothing plugged into it shows only while its node is hovered: the graph
+   stays clean, and the handle is there the moment the pointer is. */
+/* Nothing plugged in: hollow, and only while the node is hovered. Filled means
+   connected, which makes a glance at a node enough to see what it is wired to. */
+/* Hidden by COLOUR, not by `opacity`.
+   The canvas is rebuilt wholesale on every render, so these elements are created afresh
+   constantly -- and an element that is created and then told to be transparent is visible
+   until it gets there. Transparent colours have nothing to animate from, so an idle port is
+   invisible in the frame it is born in as well as in every frame after it. */
+.ng-port-idle .ng-port-dot {
+	background-color: #00000000;
+	border-color: #00000000;
+}
+
+/* Hollow, and only while the node is hovered: filled means connected, so a glance at a node
+   says what it is wired to. */
+.ng-node:hover .ng-port-idle .ng-port-dot {
+	background-color: #0e0e14;
+	border-color: #12141c;
+}
+/* Hovering anywhere in the strip lights the dot, which is how the bigger grab area announces
+   itself: the cursor does not have to be ON the dot for the dot to say it is ready. */
+.ng-port:hover .ng-port-dot { background-color: #fdc04c; }
+
+/* WHICH PORT THIS IS. Only a node with more than one output draws these, which today is an
+   objective: six fields, six ports, and a dot on its own cannot say which field it writes.
+
+   Hidden by COLOUR and shown on node hover, exactly like an idle dot and for the same two
+   reasons: six labels on every objective would make the resting canvas unreadable, and an
+   element told to be transparent after it is created is visible in the frame it is born in,
+   which on a canvas rebuilt every render means a permanent shimmer. A wired port's dot is
+   filled either way, so a glance still says what is connected.
+
+   Its position and size are written inline by the renderer, because both scale with the
+   zoom, and `pointer-events: none` keeps it from taking the press meant for the strip. */
+.ng-port-label {
+	position: absolute;
+	color: #00000000;
+	white-space: nowrap;
+	overflow: hidden;
+	text-align: right;
+	pointer-events: none;
+	z-index: 4;
+}
+
+.ng-node:hover .ng-port-label { color: #8b94a7; }
+
+/* THE HALO. A soft disc and ring centred on the dot, invisible until the pointer is inside
+   the grab strip, which is the moment a drag would start a connector. The strip is 44px of
+   node height and mostly empty, so without this the only way to find out whether a press
+   would begin a wire was to press. Its size, radius and border width are written inline by
+   the renderer, because all three have to grow with the zoom.
+
+   `pointer-events: none` so it never takes the press it is advertising: the drag belongs to
+   the strip underneath it. Drawn BEFORE the dot in the markup, so the dot sits on top. */
+.ng-port-halo {
+	position: absolute;
+	box-sizing: border-box;
+	/* TRANSPARENT, not `opacity: 0`, and no transition. See the note on `.ng-port-idle`: a
+	   render rebuilds the canvas, so a halo hidden by an animated opacity fades in from the
+	   default on every rebuild and the graph shimmers with rings nobody is hovering. */
+	background-color: #fdc04c00;
+	border: 1px #fdc04c00;
+	pointer-events: none;
+}
+
+.ng-port:hover .ng-port-halo {
+	background-color: #fdc04c1a;
+	border-color: #fdc04ca0;
+}
+
+/* The hover overlay, laid ALONG the connector under the pointer rather than restyling it.
+   Its own elements, so nothing competes with the inline colour the renderer writes on the real
+   bars. Brighter and above them, so it is obvious which wire a click is about to pick; quieter
+   than the picked one, which is the next step up. */
+.ng-edge-hover {
+	background-color: #cfd6e4;
+	z-index: 5;
+}
+
+/* The one connector that has been clicked. Brighter than the ones merely touching the
+   selection, and above them, because Delete is about to act on exactly this one. */
+.ng-edge.ng-edge-picked {
+	background-color: #fdc04c;
+	/* No height here. The renderer writes one inline at the current zoom, and an inline
+	   value beats the stylesheet -- the same trap the port radius fell into. */
+	z-index: 6;
+}
+
+/* A comment frame: the designer's own grouping of the graph. Behind everything, with a
+   title bar that is the only part of it that takes a press -- the body must not, or it would
+   swallow every click meant for the nodes sitting inside it. */
+.ng-comment {
+	position: absolute;
+	border: 1dp #ffffff22;
+	border-radius: 4dp;
+	z-index: 0;
+	pointer-events: none;
+}
+
+.ng-comment-head {
+	position: absolute;
+	left: 0;
+	top: 0;
+	pointer-events: auto;
+	drag: drag;
+	cursor: move;
+	overflow: hidden;
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	justify-content: space-between;
+}
+
+
+/* A grouping's title: bold, centred in its bar on the nodes' left axis, an inline box round
+   the text so a double-click on it renames. Size and inset are written inline at the zoom. */
+.ng-comment-title {
+	display: inline-block;
+	color: #f0f2f7;
+	font-weight: bold;
+	white-space: nowrap;
+	overflow: hidden;
+}
+
+.ng-comment-selected { border-color: #fdc04c; }
+
+/* The corner a grouping is resized from. `pointer-events: auto` because the body of the frame
+   has them off -- it sits behind the nodes and must not swallow their clicks -- so the grip has
+   to turn them back on for itself alone. */
+.ng-comment-grip {
+	position: absolute;
+	right: 0dp;
+	bottom: 0dp;
+	pointer-events: auto;
+	drag: drag;
+	cursor: nwse-resize;
+	background-color: #ffffff14;
+	border-radius: 0dp 0dp 4dp 0dp;
+}
+
+.ng-comment-grip:hover { background-color: #fdc04c66; }
+
+/* The hint about whatever the pointer is over. Its own element beside the counts, and picked
+   out, because it changes as the mouse moves and the counts do not. */
+.ng-graph-hint {
+	color: #fdc04c;
+	margin-right: 14dp;
+	white-space: nowrap;
+	overflow: hidden;
+} .ng-comment-t1 .ng-comment-head { background-color: #40e0c038; } .ng-comment-t2 .ng-comment-head { background-color: #7aa2f738; } .ng-comment-t3 .ng-comment-head { background-color: #fdc04c38; } .ng-comment-t4 .ng-comment-head { background-color: #f77a9d38; } .ng-comment-t5 .ng-comment-head { background-color: #b18af738; } .ng-comment-t6 .ng-comment-head { background-color: #8fd46238; }
+
+/* The create palette. Floats over the canvas at the cursor, above everything in the
+   window, and is sized in px because it is positioned from canvas arithmetic. */
+.ng-palette {
+	position: absolute;
+	/* Grown twice now, with the text: this is the box a designer reads most and it started at
+	   320 with an 11px kind chip. The width has to follow the type or a longer definition name
+	   simply clips instead. */
+	width: 500px;
+	padding: 13px;
+	background-color: #11131a;
+	border: 1dp #50505a80;
+	border-radius: 4dp;
+	box-shadow: 0dp 4dp 14dp 0dp #00000099;
+	z-index: 120;
+	display: flex;
+	flex-direction: column;
+}
+
+.ng-palette.hidden { display: none; }
+
+.ng-palette-title {
+	font-size: 20px;
+	color: #8a8f9a;
+	margin-bottom: 8px;
+}
+
+/* `flex: 0 0 auto`, because .ng-search says `flex: 1` and this is a COLUMN flex container:
+   there that is a rule about HEIGHT, and the box collapsed to a four-pixel sliver under the
+   list below it. */
+.ng-palette-search {
+	/* NOT `width: 100%`. RmlUi sizes the CONTENT box by default, so 100% plus this field's own
+	   padding and border came out wider than the box it sits in and hung over both edges.
+	   `border-box` makes the declared width the one that is actually drawn. */
+	box-sizing: border-box;
+	width: 100%;
+	height: 40px;
+	line-height: 40px;
+	font-size: 20px;
+	flex: 0 0 40px;
+	margin-bottom: 9px;
+}
+
+.ng-palette-kinds {
+	display: flex;
+	flex-direction: row;
+	gap: 5px;
+	margin-bottom: 7px;
+}
+
+.ng-palette-chip {
+	padding: 5px 14px;
+	border-radius: 4dp;
+	border: 1dp #50505a60;
+	font-size: 17px;
+	color: #8a8f9a;
+}
+
+.ng-palette-chip:hover { color: #d6dae4; border-color: #6a6a80cc; }
+
+.ng-palette-chip.active {
+	color: #11131a;
+	background-color: #7aa2f7;
+	border-color: #7aa2f7;
+}
+
+/* A kind the wire in flight cannot reach. Shown, so the row keeps its shape, but plainly not
+   available. */
+.ng-palette-chip.disabled {
+	color: #4a4f5c;
+	border-color: #30343e;
+}
+
+.ng-palette-chip.disabled:hover { color: #4a4f5c; border-color: #30343e; }
+
+.ng-palette-list {
+	max-height: 400px;
+	/* A row's worth of headroom, so the first entry does not sit hard against the field above
+	   it and read as clipped. */
+	padding-top: 2px;
+	overflow-y: auto;
+	display: flex;
+	flex-direction: column;
+}
+
+.ng-palette-row {
+	padding: 7px 10px;
+	border-radius: 4px;
+	display: flex;
+	flex-direction: row;
+}
+
+.ng-palette-row:hover { background-color: #232838; }
+.ng-palette-row.active { background-color: #2b3146; }
+
+/* The kind chip, so a list mixing both reads at a glance. */
+.ng-palette-kind {
+	width: 92px;
+	font-size: 17px;
+	color: #8a8f9a;
+}
+
+.ng-palette-name { font-size: 20px; color: #d6dae4; }
+
+.ng-palette-hint {
+	font-size: 17px;
+	color: #6b7180;
+	margin-top: 8px;
+}
+
+/* The controls card. Parked against the viewport's right edge and slid out of sight by its
+   own width; the viewport clips, so out of sight is genuinely off screen. */
+.ng-graph-help {
+	position: absolute;
+	top: 0px;
+	right: 0px;
+	width: 552px;
+	height: 100%;
+	box-sizing: border-box;
+	padding: 14px 16px;
+	/* Nearly opaque. At #ee the graph read through it and the card was harder to read than the
+	   thing it was covering. */
+	background-color: #0b0d13fa;
+	border-left: 1dp #3a3a4a80;
+	z-index: 110;
+	display: flex;
+	flex-direction: column;
+	transition: margin-right 0.16s quadratic-out;
+}
+
+/* Slid away. A margin rather than a transform: a transform would move what the pointer can
+   hit and what the viewport clips out of step with each other. */
+/* Exactly its own width out, so the edge tab on its left edge is all that shows (Q10). */
+.ng-graph-help-out { margin-right: -552px; }
+
+.ng-graph-help-head {
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 8px;
+}
+
+.ng-graph-help-title {
+	font-size: 23px;
+	color: #d6dae4;
+}
+
+.ng-graph-help-body {
+	overflow-y: auto;
+	display: flex;
+	flex-direction: column;
+}
+
+/* A heading inside the card, for the group of controls under it. */
+.ng-help-group {
+	font-size: 19px;
+	color: #6b7180;
+	margin-top: 14px;
+	margin-bottom: 5px;
+}
+
+.ng-help-row {
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	margin-bottom: 4px;
+}
+
+/* The key itself, set apart from what it does.
+   
+   `flex: 0 0` and not just a width: this is a child of a flex row, and a flex child SHRINKS
+   below its declared width by default, so the keys spilled into the column next to them from a
+   box that was no longer as wide as it said. The width is sized for the longest key there is
+   rather than for the average, so nothing has to be clipped at all. */
+.ng-help-key {
+	/* 208, because the widest key's text MEASURES 203px at the resolution this is used at, and
+	   a 200px column clipped it by three. The margin is the gutter; the column is not the
+	   gutter. Re-measure with the layout audit if the wording changes. */
+	flex: 0 0 208px;
+	width: 208px;
+	margin-right: 22px;
+	font-size: 21px;
+	color: #40e0c0;
+	white-space: nowrap;
+	overflow: hidden;
+}
+
+.ng-help-what {
+	font-size: 21px;
+	color: #b9c0cf;
+	white-space: nowrap;
+	overflow: hidden;
+}
+
+/* The rubber band. Deliberately thin and bright rather than a heavy fill: it is drawn
+   over the nodes it is about to select and it must not hide them while it does. */
+/* THE MINIMAP.
+
+   Sized in `dp` and not in `px`, unlike everything inside the canvas. The canvas sizes in px
+   because its contents have to line up with layout coordinates; the minimap is chrome, and
+   chrome that does not grow with the display is chrome at half its size on a 4K screen. What
+   goes INSIDE it is written inline in px by Lua, computed from the box's measured size, so the
+   two never have to agree about a number.
+
+   `drag: drag` so a press can be dragged into a pan. Without it RmlUi delivers the press and
+   nothing after it, and the map would jump once per click rather than follow the pointer. */
+.ng-graph-minimap {
+	position: absolute;
+	left: 10dp;
+	bottom: 18dp;
+	width: 190dp;
+	height: 126dp;
+	box-sizing: border-box;
+	border: 1dp #3a3a4a80;
+	border-radius: 3dp;
+	background-color: #0b0d13e6;
+	z-index: 100;
+	drag: drag;
+}
+
+/* What Lua rewrites. `pointer-events: none` so a dot never takes the press: the drag that pans
+   the graph is dispatched to the map itself, and a dot swallowing it would make the map dead
+   in exactly the places there is something to aim at. */
+.ng-graph-minimap-body {
+	position: absolute;
+	left: 0px;
+	top: 0px;
+	width: 100%;
+	height: 100%;
+	pointer-events: none;
+}
+
+/* One per node. Lua writes left, top, width and height inline. */
+.ng-graph-minimap-dot {
+	position: absolute;
+	background-color: #8a8f9a;
+}
+
+/* Explicitly, the way every other hideable thing in this stylesheet spells it, rather than
+   leaning on the shared `.hidden` utility. */
+.ng-graph-minimap.hidden { display: none; }
+.ng-graph-minimap-sel { background-color: #fdc04c; }
+
+/* A grouping, drawn behind the dots as an outline, so the shape of the graph stays legible
+   where the nodes themselves are too small to tell apart. */
+.ng-graph-minimap-frame {
+	position: absolute;
+	border: 1dp #6b728080;
+	background-color: #6b72801a;
+}
+
+/* What the window is looking at. A sibling of the body, so a rebuild of the dots leaves it
+   alone and a pan moves this one element and nothing else. */
+.ng-graph-minimap-view {
+	position: absolute;
+	border: 1dp #fdc04c;
+	background-color: #fdc04c1a;
+	pointer-events: none;
+}
+
+.ng-graph-marquee {
+	position: absolute;
+	border: 1px #fdc04c;
+	background-color: #fdc04c1a;
+	/* Above the nodes, and it must never take a press: the drag that is drawing it is being
+	   dispatched to the canvas underneath. */
+	z-index: 40;
+	pointer-events: none;
+}
+
+/* While a connector is in flight: what it could legally land on, and what it could not.
+   Deliberately a quieting of the illegal ones rather than a red mark on them -- the graph
+   should read as "here are your options", not as a wall of errors. */
+.ng-node-legal { border-color: #40e0c0; }
+.ng-node-illegal { opacity: 0.35; }
+
+/* The node a drop would land on. */
+.ng-node-drop {
+	border-color: #fdc04c;
+	box-shadow: 0dp 0dp 0dp 2dp #fdc04c55;
+}
+
+/* The connector being dragged. Brighter and thicker than a settled one, and above them,
+   so it stays legible while it is crossing a dense patch of graph. */
+.ng-edge-live {
+	background-color: #fdc04c;
+	height: 3px;
+	z-index: 3;
+}
+
+/* --- legend -------------------------------------------------------------- */
+.ng-legend {
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	gap: 16dp;
+	height: 30dp;
+	margin-top: 6dp;
+	padding: 0dp 6dp;
+}
+
+/* The zone badge: the name of the area this node is bound to. A zone is a shared VALUE, not
+   a step, so it rides on the node that uses it and is never a node or an edge of its own. */
+.ng-node-badge {
+	margin-left: auto;
+	padding: 0dp 4dp;
+	border-radius: 3dp;
+	background-color: #7aa2f733;
+	color: #9ec1ff;
+	white-space: nowrap;
+	overflow: hidden;
+}
+
+.ng-legend-label {
+	font-size: 1.25rem;
+	color: #6b7280;
+	white-space: nowrap;
+}
+
+/* ==========================================================================
+   8. HIDING
+   `.hidden` from rml-utility-classes.rcss is `display: none` at one class of
+   specificity, so it ties with any class here that declares its own display
+   and loses to any descendant rule. This block, last in the sheet, makes
+   adding `hidden` from Lua work on every element in the document regardless.
+   ========================================================================== */
+.tf-title.hidden,
+.ng-header-btns.hidden,
+.ng-check-row.hidden,
+.ng-legend.hidden,
+.ng-graph-head.hidden,
+.ng-graph-tools.hidden,
+.ng-graph-viewport.hidden {
+	display: none;
+}
+
+/* The brush drives these with data-if bindings; this panel drives them from Lua, so the
+   hidden variants need a rule of their own. */
+.tf-header-icon.hidden { display: none; }
+
+/* --- the background grid and the scrollbars (screen space, siblings of the canvas) ---- */
+.ng-graph-grid {
+	position: absolute;
+	left: 0px;
+	top: 0px;
+	pointer-events: none;
+}
+.ng-grid-v,
+.ng-grid-h {
+	position: absolute;
+	background-color: #ffffff10;
+}
+.ng-grid-v { top: 0px; width: 1px; height: 100%; }
+.ng-grid-h { left: 0px; height: 1px; width: 100%; }
+.ng-grid-major { background-color: #ffffff1e; }
+
+.ng-graph-scroll {
+	position: absolute;
+	background-color: #ffffff06;
+	z-index: 90;
+}
+/* Starts below the KEYS edge tab, which sits at the top of the same edge. */
+.ng-graph-scroll-y { right: 0px; top: 86px; bottom: 12dp; width: 12dp; }
+.ng-graph-scroll-x { left: 0px; right: 12dp; bottom: 0px; height: 12dp; }
+.ng-graph-scroll-thumb {
+	position: absolute;
+	border-radius: 5dp;
+	background-color: #ffffff26;
+	cursor: pointer;
+}
+.ng-graph-scroll-thumb:hover { background-color: #ffffff40; }
+.ng-graph-scroll-y .ng-graph-scroll-thumb { left: 2dp; right: 2dp; top: 0px; height: 40px; }
+.ng-graph-scroll-x .ng-graph-scroll-thumb { top: 2dp; bottom: 2dp; left: 0px; width: 40px; }
+
+/* --- the toolbar: four groups (VIEW | EDIT | PANELS | FIND), bigger than the panel's chips -- */
+.ng-tool-group {
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	gap: 5dp;
+	flex: 0 0 auto;
+}
+.ng-tool-sep {
+	width: 1dp;
+	height: 22dp;
+	margin: 0dp 4dp;
+	background-color: #3a3a4a;
+	flex: 0 0 auto;
+}
+.ng-graph-tools .tf-overlay-chip { padding: 5dp 11dp; }
+.ng-graph-tools .tf-overlay-chip-label { font-size: 1.15rem; }
+
+.ng-find { gap: 4dp; }
+.ng-search.ng-find-input {
+	flex: 0 0 180dp;
+	height: 28dp;
+	line-height: 28dp;
+	font-size: 1.1rem;
+}
+.ng-find-clear {
+	width: 22dp;
+	height: 22dp;
+	line-height: 22dp;
+	text-align: center;
+	font-size: 1.1rem;
+	color: #9ca3af;
+	border-radius: 11dp;
+	background-color: #2a2a34;
+	cursor: pointer;
+}
+.ng-find-clear:hover { color: #ffffff; background-color: #3a3a46; }
+.ng-find-chip {
+	padding: 4dp 8dp;
+	font-size: 1.1rem;
+	border-radius: 4dp;
+	border: 1dp #3e3e4a;
+	color: #7a8190;
+	background-color: #1c1c24;
+	cursor: pointer;
+}
+.ng-find-chip:hover { color: #d8dce4; }
+.ng-find-chip.active { color: #0e0e14; }
+
+/* The hint (what the pointer is over) and the counts: readable, not footnotes. */
+.ng-graph-hint { font-size: 1.25rem; }
+#ng-graph-status { font-size: 1.2rem; color: #8b93a3; }
+
+/* --- the bound parameter form (me_form_view.lua) -------------------------------------- */
+/* The checkbox is a div with a bound `checked` class, not an <input>: the input's own state
+   and a model value would be two owners of one fact. Same look as `.ng-check:checked`. */
+.ng-check.checked {
+	border-color: #40e0c0;
+	decorator: image("/luaui/images/terraform_brush/check_on.png" scale-down);
+}
+
+/* --- a node's editor rows (stage three, Q8) ------------------------------------------ */
+/* One editor row: a label, then a live control. `drag: block` so pressing into a field does
+   not start dragging the node it sits in. */
+.ng-node-edit {
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	gap: 6px;
+	drag: block;
+}
+.ng-node-elabel {
+	flex: 0 0 38%;
+	color: #bcc4d2;
+	white-space: nowrap;
+	overflow: hidden;
+}
+.ng-node-elabel-req { color: #d9b35c; }
+.ng-node-edit-invalid .ng-node-elabel { color: #ef6b6b; }
+.ng-node-econtrol {
+	flex: 1 1 auto;
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	gap: 4px;
+	overflow: hidden;
+}
+.ng-node-input,
+.ng-node-select {
+	flex: 1 1 auto;
+	width: 100%;
+	padding: 0px 5px;
+	color: #d8dce4;
+	background-color: #0f1016;
+	border: 1px #40404a90;
+	border-radius: 3px;
+}
+.ng-node-input:focus { border-color: #6a6a80; }
+.ng-node-edit-invalid .ng-node-input { border-color: #ef6b6b90; }
+.ng-node-ro {
+	flex: 1 1 auto;
+	color: #a7afbf;
+	white-space: nowrap;
+	overflow: hidden;
+}
+.ng-node-pick {
+	flex: 0 0 auto;
+	padding: 0px 6px;
+	color: #fdc04c;
+	border: 1px #fdc04c60;
+	border-radius: 3px;
+	cursor: pointer;
+}
+.ng-node-pick:hover { background-color: #fdc04c22; }
+/* An open node is taller than the layout's row pitch: draw it over the node below it, lifted. */
+.ng-node.ng-node-open {
+	z-index: 20;
+	box-shadow: 0px 6px 16px 0px #000000a0;
+}
+
+/* The minimap slides out to the left rather than vanishing: its tab stays at the corner. */
+.ng-graph-minimap-out { margin-left: -200dp; }
+.ng-graph-minimap { transition: margin-left 0.15s; }
+.ng-graph-help { transition: margin-right 0.15s; }
+
+/* --- graph QoL, stage four (PtaQ, 2026-09-26) ------------------------------------------ */
+
+/* THE TITLE BAR. The node's name on a backdrop of its own, the full width of the box, centred.
+   Its box (height, the negative side margins that undo the port gutter, the top radius) is
+   written inline at the zoom; the colour here is the node's own, faintly. */
+.ng-node-titlebar {
+	background-color: #ffffff0c;
+	border-bottom: 1px #ffffff18;
+}
+.ng-node-cycle .ng-node-titlebar { background-color: #ef444430; border-bottom-color: #ef444455; }
+.ng-node-dim .ng-node-titlebar { background-color: #ffffff06; border-bottom-color: #ffffff0c; }
+/* OVERVIEW (zoomed out): the title bar IS the node, so it has no bottom rule; the name is
+   one line, sized by the Lua (Graph.overviewFit). */
+.ng-node-overview .ng-node-titlebar { border-bottom-width: 0px; }
+/* An inline box round the NAME only, so a double-click on the text renames and one on the
+   rest of the bar opens the node. */
+.ng-node-title { text-align: left; display: inline-block; }
+
+/* The type line: a touch bigger and brighter than it was. */
+.ng-node-sub { color: #e1e6ee; }
+
+/* A node's select: its box is the cell's, border and all, or the arrow at its right end is
+   cut off by the cell (`overflow: hidden`). */
+.ng-node-select { box-sizing: border-box; padding: 0px; }
+
+/* The in-place rename field over a node's name. */
+.ng-node-rename { position: absolute; z-index: 120; }
+.ng-node-rename.hidden { display: none; }
+.ng-rename-input {
+	box-sizing: border-box;
+	padding: 0px 3px;
+	font-weight: bold;
+	color: #ffffff;
+	background-color: #0b0c12;
+	border: 1px #fdc04c;
+	border-radius: 3px;
+}
+
+/* The hover pad past a named-port node's right edge: live only while the node is hovered. */
+.ng-node-hoverpad {
+	position: absolute;
+	visibility: hidden;
+	drag: block;
+	z-index: 1;
+}
+.ng-node:hover .ng-node-hoverpad { visibility: visible; }
+
+/* A parameter row: the name and the value sit on one centred line. */
+.ng-node-param { align-items: center; }
+.ng-node-pvalue { color: #e8ecf2; }
+
+/* THE EXPAND STUB: a pill on the node's bottom edge, half of it hanging below the box. Its box
+   and the chevron's are written inline at the zoom. */
+.ng-node-expand {
+	position: absolute;
+	box-sizing: border-box;
+	background-color: #1f222d;
+	border: 1px #ffffff30;
+	box-shadow: 0px 2px 4px 0px #00000080;
+	cursor: pointer;
+	z-index: 6;
+}
+.ng-node-expand:hover { background-color: #3a3020; border-color: #fdc04c; }
+.ng-node-expand-open { background-color: #2c2f3c; }
+.ng-node-chevron {
+	position: absolute;
+	box-sizing: border-box;
+	border-right: 2px #b8c0ce;
+	border-bottom: 2px #b8c0ce;
+	transform: rotate(45deg);
+	pointer-events: none;
+}
+.ng-node-expand-open .ng-node-chevron { transform: rotate(-135deg); }
+.ng-node-expand:hover .ng-node-chevron { border-color: #fdc04c; }
+/* Only while the node is hovered (PtaQ, 2026-09-26). `visibility`, not opacity: the canvas is
+   rebuilt constantly and an element born hidden this way never flashes, and a hidden stub
+   takes no clicks, so the half below the box is not a trap for a press meant for the canvas. */
+.ng-node-expand { visibility: hidden; }
+.ng-node:hover .ng-node-expand { visibility: visible; }
+
+/* A node's select, dark like every other control (the shared `select` is a light popup). */
+.ng-node-select selectvalue {
+	padding: 0px 6px;
+	margin-right: 16px;
+	color: #d8dce4;
+	background-color: #0f1016;
+	white-space: nowrap;
+	overflow: hidden;
+}
+/* RmlUi's own arrow cannot follow the zoom (it takes no inline style), so it is drawn empty
+   and `.ng-node-selectarrow` stands in for it. */
+.ng-node-select selectarrow {
+	width: 0px;
+	height: 0px;
+	border-width: 0px;
+}
+.ng-node-selectwrap {
+	position: relative;
+	flex: 1 1 auto;
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+}
+.ng-node-selectarrow {
+	position: absolute;
+	box-sizing: border-box;
+	border-right: 2px #b8c0ce;
+	border-bottom: 2px #b8c0ce;
+	transform: rotate(45deg);
+	pointer-events: none;
+}
+.ng-node-selectwrap:hover .ng-node-selectarrow { border-color: #fdc04c; }
+.ng-node-select selectbox {
+	max-height: 240px;
+	background-color: #13141c;
+	border: 1px #50505a;
+	border-top-width: 0px;
+}
+.ng-node-select option {
+	padding: 3px 6px;
+	color: #d8dce4;
+	background-color: #13141c;
+	white-space: nowrap;
+}
+.ng-node-select option:hover { background-color: #2b2113; color: #ffd88f; }
+.ng-node-select option:checked { background-color: #2a2a36; }
+.ng-node-select:focus { border-color: #6a6a80; }
+
+/* A multi-port node's port NAMES float outside it, past the dots, only while it is hovered.
+   Hidden by colour (see `.ng-port-idle`); the hovered node is lifted so its names draw over
+   whatever sits to its right. */
+.ng-port-label {
+	text-align: left;
+	background-color: #00000000;
+	overflow: visible;
+	z-index: 12;
+}
+/* A port's name is a grab handle too (a wire pulls off it like off the dot), so it takes the
+   pointer, and it is hidden by VISIBILITY rather than colour: a hidden element takes no press. */
+.ng-port-label {
+	text-align: left;
+	padding-left: 6px;
+	font-weight: bold;
+	box-sizing: border-box;
+	pointer-events: auto;
+	drag: drag;
+	cursor: pointer;
+	visibility: hidden;
+}
+.ng-node:hover .ng-port-label,
+.ng-port-label.ng-port-label-wired { visibility: visible; }
+.ng-port-label:hover { border-color: #fdc04c; color: #ffe6a8; }
+.ng-node:hover .ng-port-label { color: #d5dbe6; background-color: #0e0f16e8; }
+/* A wired port's name is always on show: its wire leaves from the end of it. */
+.ng-port-label.ng-port-label-wired { color: #f2cf7e; background-color: #2a2213f0; border: 1px #b8862a; }
+/* A shut node with room for more than one summary line wraps it. */
+.ng-node-summary-wrap { display: block; white-space: normal; }
+.ng-node-summary-wrap .ng-node-pvalue { white-space: normal; }
+
+/* The wire under the pointer: a glow laid along it. */
+.ng-edge-hover { background-color: #eef1f7; }
+/* A hovered port's dot lights up and grows, whether or not anything is plugged into it. Four
+   selectors deep and last, because the idle-port rule (`.ng-node:hover .ng-port-idle ...`) is
+   as specific and painted a hovered empty port BLACK. */
+.ng-node .ng-port:hover .ng-port-dot {
+	background-color: #fdc04c;
+	border-color: #fff4d6;
+	transform: scale(1.4);
+}
+
+/* THE SEVER BUTTON, on the middle of the hovered wire when the pointer is there. Its box is
+   written inline at the zoom. Never takes the pointer: the click is the canvas's. */
+.ng-edge-sever {
+	position: absolute;
+	box-sizing: border-box;
+	background-color: #d8434b;
+	border: 1px #ffffffd0;
+	box-shadow: 0px 2px 6px 0px #000000a0;
+	z-index: 8;
+	pointer-events: none;
+}
+.ng-edge-sever.hidden { display: none; }
+.ng-edge-sever-bar {
+	position: absolute;
+	background-color: #ffffff;
+	transform-origin: center;
+}
+
+/* A named port's label, one letter per element, laid along the wire in flight. */
+.ng-live-char {
+	position: absolute;
+	text-align: center;
+	color: #ffe2a0;
+	font-weight: bold;
+	font-effect: outline(2px #0e0e14);
+	z-index: 7;
+	pointer-events: none;
+}
+.ng-live-char.hidden { display: none; }
+
+/* EDGE TABS: a handle that sticks out of the edge a panel slides from and stays on screen when
+   it is shut. Both the same size, and bigger (PtaQ, 2026-09-26). `drag: block` so a press on
+   one never starts the minimap's jump-drag or the canvas's rubber band. */
+.ng-edge-tab {
+	position: absolute;
+	drag: block;
+	/* The border inside the 28px, so a tab parked at `-28px` ends exactly at its edge at any
+	   density (at 4K the 1dp borders made it 30px and it poked 2px past the viewport). */
+	box-sizing: border-box;
+	width: 28px;
+	height: 80px;
+	font-size: 15px;
+	font-weight: bold;
+	color: #c3cad8;
+	background-color: #1c1f2bf5;
+	border: 1dp #4a4a5c;
+	box-shadow: 0px 2px 8px 0px #00000090;
+	cursor: pointer;
+	z-index: 5;
+}
+.ng-edge-tab:hover { color: #fdc04c; border-color: #fdc04c90; background-color: #2a2518f5; }
+.ng-edge-tab-keys {
+	left: -28px;
+	top: 8px;
+	border-right-width: 0px;
+	border-radius: 8px 0px 0px 8px;
+}
+.ng-edge-tab-map {
+	right: -28px;
+	bottom: -1dp;
+	border-left-width: 0px;
+	border-radius: 0px 8px 8px 0px;
+}
+/* The label runs UP the tab, in capitals (PtaQ, 2026-09-26): a box the tab's size turned on
+   its side and centred on it. A transform draws it turned without moving the layout. */
+.ng-edge-tab-label {
+	position: absolute;
+	left: -26px;
+	top: 26px;
+	width: 80px;
+	height: 28px;
+	line-height: 28px;
+	text-align: center;
+	letter-spacing: 2px;
+	transform: rotate(-90deg);
+	pointer-events: none;
+}
+/* The card parks LEFT of the vertical scrollbar, so opening it never hides the scrollbar. */
+.ng-graph-help { right: 12dp; }
+.ng-graph-scroll-y { top: 96px; }
+
+/* The legend, the hint and the counts under the canvas: readable, not footnotes. */
+.ng-graph-root .ng-legend { height: 36dp; gap: 11dp; }
+.ng-graph-root .ng-legend-item { gap: 5dp; }
+.ng-graph-root .ng-legend-swatch { width: 16dp; height: 16dp; }
+.ng-graph-root .ng-legend-label { font-size: 1.32rem; color: #aab2c1; }
+.ng-graph-root .ng-graph-hint { font-size: 1.36rem; color: #ffcf6e; flex: 0 1 auto; text-align: left; margin-right: 14dp; }
+#ng-graph-status { font-size: 1.32rem; color: #b6bdca; flex-shrink: 0; }
+
+/* SEARCH FIELDS with the clear x and the magnifier INSIDE, on the right. The toolbar's is in
+   dp (chrome); the palette's in px, like the palette. */
+.ng-searchbox { position: relative; }
+.ng-searchbox .ng-search { box-sizing: border-box; width: 100%; }
+.ng-find-box { flex: 0 0 230dp; height: 26dp; }
+.ng-search.ng-find-input { height: 24dp; line-height: 22dp; padding-right: 50dp; font-size: 1.15rem; }
+.ng-search-clear {
+	position: absolute;
+	right: 26dp;
+	top: 4dp;
+	width: 18dp;
+	height: 18dp;
+	border-radius: 9dp;
+	background-color: #2e2f3a;
+	cursor: pointer;
+}
+.ng-search-clear.hidden { display: none; }
+.ng-search-clear:hover { background-color: #4a4b58; }
+.ng-x-bar {
+	position: absolute;
+	left: 4dp;
+	top: 8dp;
+	width: 10dp;
+	height: 2dp;
+	background-color: #c3cad8;
+	transform-origin: center;
+}
+.ng-x-a { transform: rotate(45deg); }
+.ng-x-b { transform: rotate(-45deg); }
+.ng-search-clear:hover .ng-x-bar { background-color: #ffffff; }
+.ng-search-glass {
+	position: absolute;
+	right: 7dp;
+	top: 5dp;
+	width: 16dp;
+	height: 16dp;
+	pointer-events: none;
+}
+.ng-glass-ring {
+	position: absolute;
+	left: 0dp;
+	top: 0dp;
+	width: 11dp;
+	height: 11dp;
+	box-sizing: border-box;
+	border: 2dp #8a92a2;
+	border-radius: 6dp;
+}
+.ng-glass-handle {
+	position: absolute;
+	left: 9dp;
+	top: 11dp;
+	width: 7dp;
+	height: 2dp;
+	background-color: #8a92a2;
+	transform: rotate(45deg);
+	transform-origin: left center;
+}
+.ng-find-chip { padding: 4dp 9dp; font-size: 1.15rem; }
+
+/* THE CREATE PALETTE, bigger: its title, its kind pills, its field and its rows. */
+.ng-palette { width: 580px; padding: 16px; }
+.ng-palette-title { font-size: 26px; font-weight: bold; color: #d6dae4; margin-bottom: 12px; }
+.ng-palette-kinds { gap: 7px; margin-bottom: 10px; }
+.ng-palette-chip { padding: 8px 18px; font-size: 20px; border-radius: 6px; }
+.ng-palette-box { flex: 0 0 50px; height: 50px; margin-bottom: 10px; }
+.ng-search.ng-palette-search { height: 50px; line-height: 50px; font-size: 24px; padding: 0px 84px 0px 12px; margin-bottom: 0px; flex: none; }
+.ng-palette-box .ng-search-clear { right: 42px; top: 13px; width: 24px; height: 24px; border-radius: 12px; }
+.ng-palette-box .ng-x-bar { left: 5px; top: 11px; width: 14px; height: 2px; }
+.ng-palette-box .ng-search-glass { right: 12px; top: 13px; width: 24px; height: 24px; }
+.ng-palette-box .ng-glass-ring { width: 17px; height: 17px; border-width: 2px; border-radius: 9px; }
+.ng-palette-box .ng-glass-handle { left: 14px; top: 16px; width: 9px; height: 2px; }
+.ng-palette-row { padding: 9px 12px; }
+.ng-palette-kind { width: 124px; font-size: 19px; }
+.ng-palette-name { font-size: 22px; }
+.ng-palette-hint { font-size: 18px; color: #8a90a0; }
+
+/* The graph's main action: + NODE, gold. */
+.tf-overlay-chip.ng-chip-primary {
+	background-color: #17150f;
+	border-color: #fdc04c73;
+	decorator: vertical-gradient(#1f1b12 #13110c);
+	box-shadow: 0dp 1dp 3dp 0dp #00000060, inset 0dp 1dp 0dp 0dp #fdc04c1a;
+}
+.tf-overlay-chip.ng-chip-primary:hover {
+	border-color: #fdc04c;
+	decorator: vertical-gradient(#2a2416 #19160f);
+}
+.ng-chip-primary .tf-overlay-chip-label { color: #fdc04c; font-weight: bold; }
+.ng-chip-primary:hover .tf-overlay-chip-label { color: #ffe3a6; }
+
+/* The minimap's connectors: one-pixel bars, their box and colour written inline. */
+.ng-graph-minimap-edge {
+	position: absolute;
+	height: 1px;
+	transform-origin: left center;
+	pointer-events: none;
+}
+
+/* The zoom readout keeps ONE width whatever it reads (35% .. 220%), so it never shoves the
+   rest of the toolbar along as the zoom changes. */
+#ng-chip-graph-zoom { width: 44dp; flex: 0 0 auto; justify-content: center; }
+
+/* The ghost of an animated zoom's last scaled frame, faded off the sharp rebuild. */
+.ng-graph-canvas-ghost {
+	position: absolute;
+	left: 0px;
+	top: 0px;
+	pointer-events: none;
+	z-index: 1;
+}
+.ng-graph-canvas-ghost.hidden { display: none; }
+.ng-node-fade { opacity: 0.45; }
+.ng-node-fade.ng-node-selected { opacity: 0.8; }
+
+/* The adapter's fades and second chip (`marks().fade`, `dim`, `chips`). */
+.ng-node-dim { opacity: 0.3; }
+.ng-node-dim.ng-node-selected { opacity: 0.7; }
+.ng-node-chip {
+	margin-left: 4dp;
+	padding: 0dp 4dp;
+	border-radius: 3dp;
+	background-color: #fdc04c33;
+	color: #fdc04c;
+	white-space: nowrap;
+}
+
+/* Gap 11: bound lists are padded with hidden blanks so they never shrink. */
+.ng-check-row.hidden { display: none; }
+
+/* Gap 11: the kind chips are a fixed-length list; the blanks are hidden. */
+.ng-find-chip.hidden,
+.ng-palette-chip.hidden { display: none; }

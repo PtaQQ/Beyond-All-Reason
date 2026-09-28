@@ -1,0 +1,401 @@
+/* ==========================================================================
+   NODE GRAPH: the stylesheet of node_graph.rml.
+
+   Split out of the mission editor's stylesheet, rule for rule, in its order: only what the
+   graph window and the canvas produce. Order matters, because many rules tie on specificity
+   and win by coming later.
+
+   Three sheets, linked in this order by node_graph.rml: this one (the base), kinds.rcss (the
+   look of each node kind: YOUR KINDS GO THERE), node_graph_after.rcss (the states, which win
+   over the kinds by coming later).
+
+   The canvas is px, not dp: node positions are raw pixels and the layout (core.lua `GRAPH`)
+   has to agree with the boxes drawn here.
+   ========================================================================== */
+
+@keyframes ng-pulse {
+	0% { opacity: 0.55; }
+	50% { opacity: 1.0; }
+	100% { opacity: 0.55; }
+}
+
+/* The same pulse for a CONNECTOR, done with colour instead of opacity.
+   A wire is forty-odd bars whose round caps overlap, so anything that makes it translucent
+   makes every joint paint twice and the wire beads. The two stops here are #ef4444 and the
+   same red already flattened onto the canvas at 55%, which is what the opacity version looked
+   like -- without ever being translucent. */
+@keyframes ng-edge-pulse {
+	0% { background-color: #892b2e; }
+	50% { background-color: #ef4444; }
+	100% { background-color: #892b2e; }
+}
+
+/* ==========================================================================
+   1. VOCABULARY CARRIED OVER FROM gui_terraform_brush.rcss
+   Same names, same look as the Terraform Brush window chrome.
+   ========================================================================== */
+
+/* --- drag handle + wordmark ------------------------------------------- */
+.tf-drag-handle {
+	cursor: move;
+	padding: 4dp 0 4dp 4dp;
+}
+
+.tf-title {
+	flex: 0 1 auto;
+	min-width: 0;
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	gap: 7dp;
+	white-space: nowrap;
+	overflow: hidden;
+}
+
+.tf-title-gem {
+	width: 4dp;
+	height: 18dp;
+	flex-shrink: 0;
+	border-radius: 2dp;
+	decorator: vertical-gradient(#ffe2a0 #d99a28);
+	box-shadow: 0dp 0dp 7dp 0dp #fdc04c70, inset 0dp 1dp 0dp 0dp #ffffff80;
+}
+
+.tf-title-main {
+	font-size: 15dp;
+	font-weight: bold;
+	letter-spacing: 1.5dp;
+	color: #eef1f6;
+}
+
+.tf-title-accent {
+	font-size: 15dp;
+	font-weight: bold;
+	letter-spacing: 2dp;
+	color: #fdc04c;
+}
+
+/* --- header buttons ---------------------------------------------------- */
+.tf-header-btn {
+	width: 22dp;
+	height: 22dp;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+	border-radius: 6dp;
+	border: 1dp transparent;
+	background-color: transparent;
+	flex-shrink: 0;
+	transition: background-color 0.12s, border-color 0.12s;
+}
+
+.tf-header-btn:hover {
+	background-color: #ffffff16;
+	border-color: #ffffff22;
+}
+
+.tf-header-btn.hidden { display: none; }
+
+/* Nothing to undo or redo. Dimmed through image-color rather than alpha, because an icon
+   dimmed by alpha renders opaque in this RmlUi build. */
+.tf-header-btn.disabled { cursor: default; }
+.tf-header-btn.disabled:hover { background-color: transparent; border-color: transparent; }
+.tf-header-btn.disabled .tf-header-icon { image-color: #4a4f57; }
+
+.tf-header-icon {
+	width: 14dp;
+	height: 14dp;
+}
+
+/* Hover-only override; must stay after .tf-header-btn:hover so red wins. */
+.tf-quit-btn:hover {
+	background-color: #4a2424;
+	border-color: #cc666690;
+}
+
+.tf-rail-spacer { flex: 1; }
+
+/* --- chips -------------------------------------------------------------- */
+.tf-overlay-chip {
+	height: 18dp;
+	padding: 0dp 8dp;
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	gap: 4dp;
+	border-radius: 5dp;
+	background-color: #2a2a34;
+	border: 1dp #3e3e4a50;
+	cursor: pointer;
+	transition: background-color 0.1s, border-color 0.1s;
+	decorator: vertical-gradient(#3a3a46 #1e1e28);
+	box-shadow: 0dp 2dp 3dp 0dp #00000050, inset 0dp 1dp 0dp 0dp #ffffff14;
+}
+
+.tf-overlay-chip.hidden { display: none; }
+
+.tf-chip-row .tf-overlay-chip { flex-shrink: 0; }
+
+.tf-overlay-chip:hover {
+	background-color: #3a3a46;
+	border-color: #5a5a6a;
+	decorator: vertical-gradient(#4a4a58 #2a2a36);
+	box-shadow: 0dp 2dp 4dp 0dp #00000060, inset 0dp 1dp 0dp 0dp #ffffff20;
+}
+
+.tf-overlay-chip.active {
+	background-color: #0d2c24;
+	border-color: #40e0c0;
+	decorator: vertical-gradient(#133a30 #081e18);
+	box-shadow: 0dp 2dp 4dp 0dp #00000060, inset 0dp 1dp 0dp 0dp #40e0c030;
+}
+
+.tf-overlay-chip.active:hover {
+	background-color: #133a30;
+	border-color: #7cecd6;
+	decorator: vertical-gradient(#18463a #0d2c24);
+	box-shadow: 0dp 2dp 5dp 0dp #00000080, inset 0dp 1dp 0dp 0dp #40e0c050;
+}
+
+/* Chip whose action has no target right now. Container dims, icon does not. */
+.tf-overlay-chip.unavailable {
+	background-color: #24242c;
+	border-color: #3a3a4430;
+	decorator: vertical-gradient(#2c2c34 #1a1a20);
+	cursor: default;
+}
+
+.tf-overlay-chip.unavailable .tf-overlay-chip-label { color: #565c66; }
+
+.tf-overlay-chip-label {
+	font-size: 1.0rem;
+	color: #9ca3af;
+	white-space: nowrap;
+}
+
+.tf-overlay-chip.active .tf-overlay-chip-label { color: #a2f2e2; }
+
+.tf-overlay-chip-sm .tf-overlay-chip-label { font-size: 0.78rem; }
+
+.tf-overlay-chip-warn .tf-overlay-chip-label { color: #ff9999; }
+
+.ng-header-btns {
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	gap: 3dp;
+	flex-shrink: 0;
+}
+
+.ng-search {
+	flex: 1;
+	height: 24dp;
+	padding: 0dp 6dp;
+	line-height: 24dp;
+	font-size: 1.0rem;
+	color: #d8dce4;
+	background-color: #161620;
+	border: 1dp #40404a60;
+	border-radius: 5dp;
+}
+
+.ng-search:focus { border-color: #6a6a80cc; }
+
+/* Checkbox row. The label is a sibling of the input, never bare text in the
+   flex row. */
+.ng-check-row {
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	gap: 6dp;
+	height: 22dp;
+	cursor: pointer;
+}
+
+.ng-check {
+	width: 16dp;
+	height: 16dp;
+	flex-shrink: 0;
+	margin-right: 0dp;
+	border: 2dp #4a4a56;
+	border-radius: 4dp;
+	background-color: #161620;
+}
+
+.ng-check:hover { border-color: #40e0c080; }
+
+.ng-check:checked {
+	border-color: #40e0c0;
+	decorator: image("/luaui/images/terraform_brush/check_on.png" scale-down);
+}
+
+.ng-check-row:hover .ng-check-label { color: #d8dce4; }
+
+.ng-graph-root {
+	pointer-events: auto;
+	position: absolute;
+	left: 16vw;
+	top: 16vh;
+	width: 46vw;
+	min-width: 620px;
+	z-index: 901;
+	padding: 6dp;
+}
+
+.ng-graph-root.hidden { display: none; }
+
+/* Resize grips: invisible, and wide enough to hit. Six pixels is what a window manager gives
+   an edge and it is enough here too; the corner gets more because a corner is aimed at.
+   
+   THE CURSOR NAMES MATTER. `luaui/rml_setup.lua` aliases a short list of CSS names onto the
+   engine's cursors (`move` -> uimove, `ew-resize` -> uiresizeh, `ns-resize` -> uiresizev, and
+   the two diagonals). Anything outside that list is passed through unchanged, the engine has
+   no cursor by that name, and the pointer silently never changes -- which is what `size_we`
+   and friends did here. */
+.ng-graph-grip {
+	position: absolute;
+	pointer-events: auto;
+	z-index: 130;
+}
+
+.ng-graph-grip-e {
+	right: 0dp;
+	top: 24dp;
+	bottom: 14dp;
+	width: 7dp;
+	/* uiresizeh: the left-and-right pair. */
+	cursor: ew-resize;
+}
+
+.ng-graph-grip-s {
+	left: 14dp;
+	right: 14dp;
+	bottom: 0dp;
+	height: 7dp;
+	/* uiresizev: the up-and-down pair. */
+	cursor: ns-resize;
+}
+
+.ng-graph-grip-se {
+	right: 0dp;
+	bottom: 0dp;
+	width: 16dp;
+	height: 16dp;
+	/* uimove, the four-arrow cursor the window title bars use, rather than the diagonal pair:
+	   the corner sizes both ways at once and this is the shape the suite has already taught. */
+	cursor: move;
+	/* The only one that is drawn, because a corner nobody can see is a corner nobody drags. */
+	background-color: #ffffff14;
+	border-radius: 0dp 0dp 4dp 0dp;
+}
+
+.ng-graph-grip-se:hover { background-color: #ffffff2e; }
+
+.ng-graph-head {
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	justify-content: space-between;
+	height: 26dp;
+	margin-bottom: 4dp;
+}
+
+/* WRAPS, and its chips do not shrink. A flex child shrinks below its own content by default,
+   and what that looks like here is every label in the row cut off by a few pixels at once --
+   which is what adding one more chip did at 3840x2160 while leaving 1920x1080 alone. A row of
+   tools that cannot fit its tools should get taller, not quietly hide their names. */
+.ng-graph-tools {
+	display: flex;
+	flex-direction: row;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6dp;
+	min-height: 32dp;
+	margin-bottom: 6dp;
+}
+
+.ng-graph-tools .tf-overlay-chip { flex: 0 0 auto; }
+
+/* The viewport clips; the canvas inside it is what Lua pans.
+   No cursor of its own: the move cursor belongs to the nodes, which are the things that
+   move. Setting it here promised that the empty canvas was draggable too. */
+.ng-graph-viewport {
+	/* `drag: drag` so the graph can be panned from ANYWHERE in the window, not only from
+	   the part of it the canvas happens to cover. Without this the empty space around a
+	   small graph belonged to nothing and the view felt walled in at its top-left. */
+	drag: drag;
+	position: relative;
+	width: 100%;
+	height: 46vh;
+	min-height: 320px;
+	overflow: hidden;
+	border-radius: 4dp;
+	border: 1dp #3a3a4a80;
+	background-color: #0e0e14;
+}
+
+/* position: relative is load-bearing: every node and edge inside is
+   position: absolute and anchors to this box. Pan by setting left/top on this
+   element, not on the viewport. Size is fixed rather than content-derived so
+   nothing reflows while dragging a node. */
+.ng-graph-canvas {
+	/* `drag: drag` so a press that misses every node pans instead of doing nothing. A
+	   press that hits a node raises the drag on the NODE, because RmlUi picks the
+	   innermost draggable, so the two gestures never fight. */
+	drag: drag;
+	position: relative;
+	left: 0dp;
+	top: 0dp;
+	width: 2400dp;
+	height: 1600dp;
+	/* The zoom scales about the canvas's own top-left, which is what makes
+	   "pointer to canvas" a subtraction and a divide rather than a matrix.
+	   KEYWORDS, not `0 0`: a bare zero has no unit, RmlUi drops the declaration,
+	   and the origin silently falls back to the default 50% 50% -- which pins the
+	   zoom to the middle of a 2400dp canvas and throws the view off the corner. */
+	transform-origin: left top;
+}
+
+/* --- nodes --------------------------------------------------------------- */
+/* `drag: drag` is what makes RmlUi raise dragstart/drag/dragend on this element. Without
+   it the node is not draggable at all, whatever listeners are attached: the events are
+   never generated. */
+.ng-node {
+	drag: drag;
+	position: absolute;
+	/* PX, NOT DP, for everything inside the canvas that the layout can see.
+	   A node's position is raw pixels, and `dp` is density-scaled: `42dp` came out
+	   36.5px here, so connectors met the node five pixels off their own port. The
+	   width never showed it because the Lua sets that inline, in px.
+	   border-box, so a width means the width. */
+	box-sizing: border-box;
+	width: 184px;
+	height: 42px;
+	/* The side padding is a GUTTER for the ports. At 6dp the dots sat on top of the
+	   subtitle; a port belongs in a lane of its own, which is what every node editor
+	   gives it. */
+	padding: 4px 14px;
+	border-radius: 5px;
+	border: 1dp #4a4a5a;
+	background-color: #1e1e28;
+	decorator: vertical-gradient(#26262f #16161d);
+	box-shadow: 0dp 2dp 5dp 0dp #00000070, inset 0dp 1dp 0dp 0dp #ffffff12;
+	/* THE STANDARD CURSOR, deliberately. A node is draggable and the four-arrow `uimove`
+	   cursor said so, but it is a large opaque glyph and it sits on top of the very thing
+	   it is hovering: the title, the ports, the wire you were about to aim at. What a node
+	   is for is read from the node, not from the pointer covering it. */
+	z-index: 2;
+	/* NO `overflow: hidden`. The port dots are centred ON this box's edges and half of each
+	   one lies outside it, so a node that clipped its own children cut every dot in half. The
+	   title, the subtitle and every parameter row already clip themselves -- each is
+	   `white-space: nowrap` with its own `overflow: hidden` -- so this was doing nothing for
+	   the text it looked as though it was there for. */
+}
+
+/* HOVER LIFTS THE WHOLE BOX, which is the affordance the cursor used to carry. The
+   DECORATOR only, on purpose: the border belongs to the selected, found and dim states,
+   and a hover rule outranks all three, so brightening it here would mean a selected node
+   stopped looking selected the moment the pointer crossed it. */
+.ng-node:hover { decorator: vertical-gradient(#31313c #1d1d26); }
+.ng-node.ng-node-dim:hover { decorator: vertical-gradient(#222229 #17171d); }
