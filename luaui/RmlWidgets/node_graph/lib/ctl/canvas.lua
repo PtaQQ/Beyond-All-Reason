@@ -201,6 +201,56 @@ return function(deps)
 		return Graph.TINT_FALLBACK
 	end
 
+	--- Show a new node selection on the canvas WITHOUT rebuilding it.
+	---
+	--- The selection reaches the canvas in exactly two places (Graph.render): a node's
+	--- `me-node-selected` class, and a wire touching a selected node drawn at full strength.
+	--- So a selection change is those two, for the nodes whose state changed and the wires that
+	--- touch them, written straight onto the elements, with the same colour function the rebuild
+	--- uses. The rebuild is 400-600 ms on a 113-node graph; this is a few dozen writes.
+	---
+	--- `before` is the selection set the canvas was last drawn with. Cycle and picked wires keep
+	--- the stylesheet's colour and are left alone, as the rebuild leaves them.
+	function Graph.relightSelection(before)
+		local after = Graph.selectionSet()
+		local changed = {}
+		for key in pairs(before or {}) do
+			if not after[key] then
+				changed[key] = true
+			end
+		end
+		for key in pairs(after) do
+			if not (before or {})[key] then
+				changed[key] = true
+			end
+		end
+		local done = {}
+		for key in pairs(changed) do
+			local node = el(Graph.nodeElementId(key))
+			if node then
+				node:SetClass("ng-node-selected", after[key] == true)
+			end
+			for _, edge in ipairs((S.graphEdgesByNode or {})[key] or {}) do
+				if not done[edge.index] then
+					done[edge.index] = true
+					local onSelection = after[edge.from] or after[edge.to]
+					local alpha = onSelection and 0xff or Graph.adapter.edgeStrength(edge)
+					Graph.wires.recolour(edge.index, alpha, onSelection and true or false)
+				end
+			end
+		end
+	end
+
+	--- The wires' GPU layer (ctl/wires.lua): the rebuild hands it the curves instead
+	--- of writing a bar element per segment.
+	Graph.wires = Graph.wires
+		or VFS.Include("luaui/RmlWidgets/node_graph/lib/ctl/wires.lua")({
+			S = S,
+			Graph = Graph,
+			GRAPH = GRAPH,
+			el = el,
+		})
+
 	--- The tint a wire carries at `t` along its length, already flattened onto the canvas.
 	---
 	--- `alpha` still means how STRONG the tint is, 0 to 255, but it is applied here rather than
@@ -1040,6 +1090,7 @@ return function(deps)
 		-- have to hit-test every one of them on every mouse move, and a two-pixel bar is not
 		-- something anybody can hit anyway.
 		S.graphEdgePoints = {}
+		Graph.wires.begin()
 		-- Which nodes a connector leaves and arrives at, for the port dots below.
 		local hasOut, hasIn = {}, {}
 		local edges = Graph.adapter.edges()
@@ -1093,21 +1144,16 @@ return function(deps)
 				-- a chevron. Which way a wire runs is already said by the ports it joins: every
 				-- one leaves the right-hand side of a node and arrives at the left-hand side of
 				-- another, so every curve in the graph runs left to right.
-				for segment = 1, points.n do
-					local left, top, width, angle = Graph.segmentStyle(points[segment], points[segment + 1])
-					local colour = ""
-					if tinted then
-						local along = points.n > 1 and (segment - 1) / (points.n - 1) or 0
-						colour = " background-color: " .. Graph.mixTint(fromTint, toTint, along, alpha) .. ";"
-					end
-					parts[#parts + 1] = string.format(
-						'<div class="%s" id="%s" style="%s%s"></div>',
-						classes,
-						Graph.segmentElementId(index, segment),
-						Graph.barStyle(left, top, width, angle),
-						colour
-					)
-				end
+				-- Drawn by the GPU layer, not as a bar element per segment (ctl/wires.lua).
+				Graph.wires.add(
+					index,
+					points,
+					fromTint,
+					toTint,
+					alpha,
+					isPicked and "picked" or (onCycle and "cycle" or "tint"),
+					onSelection and true or false
+				)
 				hasOut[edge.from] = true
 				hasIn[edge.to] = true
 			end

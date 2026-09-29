@@ -234,10 +234,11 @@
 	border-color: #00000000;
 }
 
-/* Hollow, and only while the node is hovered: filled means connected, so a glance at a node
-   says what it is wired to. */
+/* Only while the node is hovered: the port in its node's own colour, dimmed, so it reads as
+   part of the graph and not as a hole in it (it was near-black). A wired port is fully lit, so
+   a glance still says what is connected. Each kind's own dimmed colour is in kinds.rcss. */
 .ng-node:hover .ng-port-idle .ng-port-dot {
-	background-color: #0e0e14;
+	background-color: #aeb6c480;
 	border-color: #12141c;
 }
 /* Hovering anywhere in the strip lights the dot, which is how the bigger grab area announces
@@ -713,6 +714,16 @@
 .tf-header-icon.hidden { display: none; }
 
 /* --- the background grid and the scrollbars (screen space, siblings of the canvas) ---- */
+/* The wires' texture (lib/ctl/wires.lua): the whole viewport, never a target. */
+.ng-graph-wires {
+	position: absolute;
+	left: 0px;
+	top: 0px;
+	width: 100%;
+	height: 100%;
+	pointer-events: none;
+}
+
 .ng-graph-grid {
 	position: absolute;
 	left: 0px;
@@ -1036,10 +1047,12 @@
    selectors deep and last, because the idle-port rule (`.ng-node:hover .ng-port-idle ...`) is
    as specific and painted a hovered empty port BLACK. */
 .ng-node .ng-port:hover .ng-port-dot {
-	background-color: #fdc04c;
+	background-color: #aeb6c4;
 	border-color: #fff4d6;
 	transform: scale(1.4);
 }
+/* A kind's hovered port is its own colour at full strength (kinds.rcss), the dimmed idle dot
+   brought up, rather than a gold that belongs to the picked-wire highlight. */
 
 /* THE SEVER BUTTON, on the middle of the hovered wire when the pointer is there. Its box is
    written inline at the zoom. Never takes the pointer: the click is the canvas's. */

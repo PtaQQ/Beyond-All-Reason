@@ -282,15 +282,45 @@
 	bottom: 0dp;
 	width: 16dp;
 	height: 16dp;
-	/* uimove, the four-arrow cursor the window title bars use, rather than the diagonal pair:
-	   the corner sizes both ways at once and this is the shape the suite has already taught. */
-	cursor: move;
+	/* The diagonal pair along this corner's own angle: top-left to bottom-right. */
+	cursor: nwse-resize;
 	/* The only one that is drawn, because a corner nobody can see is a corner nobody drags. */
 	background-color: #ffffff14;
 	border-radius: 0dp 0dp 4dp 0dp;
 }
 
 .ng-graph-grip-se:hover { background-color: #ffffff2e; }
+
+/* The top and left edges size the window too; pulling one moves the window so the opposite
+   edge stays put. The north strip is the top 5dp only, above the title bar, so a press on the
+   title still moves the window rather than sizing it. */
+.ng-graph-grip-w {
+	left: 0dp;
+	top: 24dp;
+	bottom: 14dp;
+	width: 7dp;
+	cursor: ew-resize;
+}
+
+.ng-graph-grip-n {
+	left: 14dp;
+	right: 14dp;
+	top: 0dp;
+	height: 5dp;
+	cursor: ns-resize;
+}
+
+.ng-graph-grip-nw,
+.ng-graph-grip-ne,
+.ng-graph-grip-sw {
+	width: 12dp;
+	height: 12dp;
+}
+
+/* Each corner shows the diagonal it pulls along: nw and se share one, ne and sw the other. */
+.ng-graph-grip-nw { left: 0dp; top: 0dp; cursor: nwse-resize; }
+.ng-graph-grip-ne { right: 0dp; top: 0dp; cursor: nesw-resize; }
+.ng-graph-grip-sw { left: 0dp; bottom: 0dp; cursor: nesw-resize; }
 
 .ng-graph-head {
 	display: flex;

@@ -46,18 +46,12 @@ return function(deps)
 				end
 			end
 		end)
+		-- FIT FRAMES the graph, as Home does: the view moves, the nodes do not (UX pass F15).
+		-- It used to re-lay every node out to pack them into the window, which threw away the
+		-- arrangement the designer had dragged into place and saved with the mission (on a
+		-- 113-node mission, into overlapping rows). RELAYOUT is the one button that moves nodes.
 		Graph.onClick("ng-chip-graph-fit", function()
-			local layout = Graph.fitLayout()
-			if not layout then
-				return
-			end
-			S.layout = layout
-			-- FIT packs the nodes to the viewport at 1:1, so a leftover zoom would undo the
-			-- one thing the button is for.
-			Graph.resetGraphView()
-			Graph.host.edited()
-			render()
-			echo("graph fitted to the window")
+			Graph.frameKeys(Graph.allKeys())
 		end)
 		-- Pan: drag the canvas itself. RmlUi raises the drag on the innermost draggable, so a
 		-- press on a node drags the node and a press on empty canvas pans -- but the node's

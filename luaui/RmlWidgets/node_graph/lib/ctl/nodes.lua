@@ -391,24 +391,11 @@ return function(deps)
 					Graph.portY(edge.from, "out", edge.port),
 					Graph.portX(edge.from, edge.port)
 				)
-				for segment = 1, count do
-					local element = el(Graph.segmentElementId(edge.index, segment))
-					if element then
-						if points then
-							local left, top, width, angle = Graph.segmentStyle(points[segment], points[segment + 1])
-							-- Position and length only. The thickness and the cap were written when
-							-- the bar was built and a drag does not change either.
-							element.style.left = Graph.px(left) .. "px"
-							element.style.top = Graph.px(top) .. "px"
-							element.style.width = Graph.px(width) .. "px"
-							element.style.transform = string.format("rotate(%.2fdeg)", angle)
-							element:SetClass("hidden", false)
-						else
-							-- The two nodes overlap, so there is no curve to draw. Hiding beats
-							-- leaving a stale one pointing at where the node used to be.
-							element:SetClass("hidden", true)
-						end
-					end
+				-- The GPU layer redraws it (ctl/wires.lua). nil when the two nodes overlap
+				-- and there is no curve: hidden rather than left pointing at where the node was.
+				Graph.wires.setPoints(edge.index, points)
+				if points then
+					S.graphEdgePoints[edge.index] = points
 				end
 			end
 		end

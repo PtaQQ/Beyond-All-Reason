@@ -47,7 +47,7 @@ local NodeGraph = {}
 
 --- The library's version (semver). Bumped by every change to node_graph/, with a line in
 --- doc/NodeGraph-changelog.md.
-NodeGraph.VERSION = "1.0.0"
+NodeGraph.VERSION = "1.1.0"
 --- The adapter contract's version. Only a removed or changed adapter field bumps it; a new
 --- field is optional with a default, so an older adapter keeps working.
 NodeGraph.CONTRACT = 1
@@ -145,8 +145,15 @@ function NodeGraph.create(opts)
 		return copy
 	end
 
-	local function render()
-		S.renderPending = true
+	--- Ask for a render on the next update. `opts.graph == "selection"`: only the node selection
+	--- changed (a host's own list or timeline picked a node), so the canvas is relit in place
+	--- (Graph.relightSelection) instead of rebuilt, when nothing else changed since it was drawn.
+	local function render(opts)
+		if opts and opts.graph == "selection" then
+			S.selPending = true
+		else
+			S.renderPending = true
+		end
 	end
 
 	-- Enter commits a field and lets go of it. `RmlUi.key_identifier` is a FUNCTION in this
@@ -403,12 +410,29 @@ function NodeGraph.create(opts)
 		S.tick = S.tick + 1
 		Window.tick()
 		Graph.update()
-		if not S.renderPending then
+		if not (S.renderPending or S.selPending) then
 			return
 		end
+		local full = S.renderPending
 		S.renderPending = false
+		S.selPending = false
 		S.elementCache = {}
-		Graph.draw(S.open)
+		-- A relight is only a relight while nothing else the selection clears has changed since
+		-- the canvas was drawn: a picked wire or a selected grouping going away needs the rebuild.
+		if
+			not full
+			and S.open
+			and S.drawnSel
+			and S.graphSelEdge == S.drawnSelEdge
+			and S.graphSelComment == S.drawnSelComment
+		then
+			Graph.relightSelection(S.drawnSel)
+		else
+			Graph.draw(S.open)
+		end
+		S.drawnSel = Graph.selectionSet()
+		S.drawnSelEdge = S.graphSelEdge
+		S.drawnSelComment = S.graphSelComment
 		if S.focusAfterRender then
 			local wanted = S.focusAfterRender
 			S.focusAfterRender = nil
@@ -451,8 +475,22 @@ function NodeGraph.create(opts)
 		return false
 	end
 
+	--- Ask for a render: `host.render()` rebuilds on the next update, `host.render({ graph =
+	--- "selection" })` only relights the selection (after the host changed it from outside).
+	host.render = render
+
+	--- widget:DrawScreen: the wires are drawn on the GPU (ctl/wires.lua), in a draw call-in.
+	function host.draw()
+		if Graph.wires then
+			Graph.wires.draw()
+		end
+	end
+
 	--- widget:Shutdown.
 	function host.shutdown()
+		if Graph.wires then
+			Graph.wires.shutdown()
+		end
 		if document then
 			document:Close()
 			document = nil

@@ -75,6 +75,9 @@
 		     when the zoom or the viewport's size changes and slides it on every pan, so an empty
 		     canvas visibly moves. It never takes the pointer. -->
 		<div id="ng-graph-grid" class="ng-graph-grid"></div>
+		<!-- THE WIRES: one texture the size of the viewport, drawn on the GPU under the nodes
+		     (lib/ctl/wires.lua). Above the grid, below the canvas. -->
+		<texture id="ng-graph-wires" class="ng-graph-wires"></texture>
 		<div id="ng-graph-canvas" class="ng-graph-canvas">
 
 		</div>
@@ -170,11 +173,16 @@
 		<div id="ng-palette-hint" class="ng-palette-hint">Enter adds the top one, Esc cancels</div>
 	</div>
 
-	<!-- Resize grips. Thin strips on the right and bottom edges and a fatter corner between
-	     them, all transparent. They only have to report `mousedown`: from there
-	     `attachResizable` reads the mouse itself every frame. -->
+	<!-- Resize grips on every edge and corner, all transparent but the bottom-right one. They
+	     only have to report `mousedown`: from there lib/ctl/window.lua reads the mouse itself
+	     every frame. -->
 	<div id="ng-graph-grip-e" class="ng-graph-grip ng-graph-grip-e"></div>
 	<div id="ng-graph-grip-s" class="ng-graph-grip ng-graph-grip-s"></div>
+	<div id="ng-graph-grip-w" class="ng-graph-grip ng-graph-grip-w"></div>
+	<div id="ng-graph-grip-n" class="ng-graph-grip ng-graph-grip-n"></div>
+	<div id="ng-graph-grip-nw" class="ng-graph-grip ng-graph-grip-nw"></div>
+	<div id="ng-graph-grip-ne" class="ng-graph-grip ng-graph-grip-ne"></div>
+	<div id="ng-graph-grip-sw" class="ng-graph-grip ng-graph-grip-sw"></div>
 	<div id="ng-graph-grip-se" class="ng-graph-grip ng-graph-grip-se"></div>
 
 	<!-- The footer: what the pointer is over (or what a drop in flight would do) on the LEFT, the

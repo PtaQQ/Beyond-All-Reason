@@ -19,6 +19,7 @@ function widget:GetInfo()
 end
 
 local passed, failed = 0, 0
+local probeSparks -- the sparks node element, kept across a selection-only render
 local fromModoption = false
 
 local function check(ok, what)
@@ -72,7 +73,17 @@ local steps = {
 				text:find("nodes") ~= nil and text:find("cycle") == nil,
 				"the status line counts without loops: " .. text
 			)
-			for _, id in ipairs({ "ng-graph-handle", "ng-graph-grip-e", "ng-graph-grip-s", "ng-graph-grip-se" }) do
+			for _, id in ipairs({
+				"ng-graph-handle",
+				"ng-graph-grip-e",
+				"ng-graph-grip-s",
+				"ng-graph-grip-se",
+				"ng-graph-grip-w",
+				"ng-graph-grip-n",
+				"ng-graph-grip-nw",
+				"ng-graph-grip-ne",
+				"ng-graph-grip-sw",
+			}) do
 				check(host.document:GetElementById(id) ~= nil, "the window has its " .. id)
 			end
 			-- Select one node, so the screenshot shows a kind's look under the selected state
@@ -91,8 +102,37 @@ local steps = {
 			end
 			local node = d.host.document:GetElementById("ng-gnode-spawner-sparks")
 			check(node ~= nil and node:IsClassSet("ng-node-selected"), "a selected node carries ng-node-selected")
+			-- The wires are one GPU texture (lib/ctl/wires.lua), not bar elements.
+			local Graph = d.host.Graph
+			check(d.host.document:GetElementById("ng-graph-wires") ~= nil, "the wires have their texture element")
+			check(
+				Graph.wires ~= nil and Graph.wires.count() == 7,
+				"the wire layer holds the seven wires: " .. tostring(Graph.wires and Graph.wires.count())
+			)
+			check(d.host.document:GetElementById("ng-edge-1-1") == nil, "and no wire is drawn as bar elements any more")
+			-- A selection changed from outside relights the canvas instead of rebuilding it.
+			probeSparks = node
+			Graph.setSelection({ "particle:flare" })
+			d.host.render({ graph = "selection" })
 			Spring.SendCommands("screenshot png")
 			Spring.Echo("[node graph probe] screenshot: the demo graph, spawner:sparks selected")
+		end,
+	},
+	{
+		wait = 5,
+		run = function()
+			local d = demo()
+			if not d then
+				return
+			end
+			local flare = d.host.document:GetElementById("ng-gnode-particle-flare")
+			local sparks = d.host.document:GetElementById("ng-gnode-spawner-sparks")
+			check(flare ~= nil and flare:IsClassSet("ng-node-selected"), "a selection-only render lights the new node")
+			check(sparks ~= nil and not sparks:IsClassSet("ng-node-selected"), "  and unlights the old one")
+			check(
+				probeSparks ~= nil and sparks ~= nil and probeSparks.id == sparks.id and probeSparks.parent_node ~= nil,
+				"  without rebuilding the canvas (the old node element is still in the document)"
+			)
 		end,
 	},
 	{

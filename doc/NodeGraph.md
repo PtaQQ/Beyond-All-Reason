@@ -54,6 +54,7 @@ function widget:Initialize()
 	graph.place(360, 600)
 end
 function widget:Update() graph.update() end
+function widget:DrawScreen() graph.draw() end -- the wires are drawn on the GPU (1.1.0)
 function widget:MouseWheel(up) return graph.mouseWheel(up) end
 function widget:KeyPress(key, _, isRepeat) return graph.keyPress(key, isRepeat) end
 function widget:Shutdown() graph.shutdown() end
@@ -71,12 +72,15 @@ function widget:Shutdown() graph.shutdown() end
 | `forms` | | Node editor callbacks, if your nodes have editors (section 7) |
 | `notice(text)` | | Show the adapter's whole-graph warning; `nil` clears it |
 | `label` | | Prefix for its log lines (default `[graph]`) |
-| `movable`, `resizable` | | Default true: the title bar drags the window, the right and bottom edges size it |
+| `movable`, `resizable` | | Default true: the title bar drags the window, every edge and corner sizes it |
 | `minWidth`, `minHeight` | | Smallest size when resizing (620, 260) |
 
 `create` returns nil and logs the reason when it cannot start: the adapter lacks a contract field, or the context already holds a graph.
 
-The returned object: `setOpen(bool)`, `place(left, top)`, `update()`, `mouseWheel(up)`, `keyPress(key, isRepeat)`, `shutdown()`, `VERSION`. `Graph`, `S` and `document` are also on it for tests; treat them as private.
+The returned object: `setOpen(bool)`, `place(left, top)`, `update()`, `draw()`, `render(opts)`, `mouseWheel(up)`, `keyPress(key, isRepeat)`, `shutdown()`, `VERSION`.
+
+- `draw()` must be called from `widget:DrawScreen`. The wires are one GPU texture under the nodes (`lib/ctl/wires.lua`); without the call the graph shows nodes and no wires.
+- `render()` asks for a rebuild on the next update. After your tool changed the node selection from outside the graph (its own list, a timeline), call `render({ graph = "selection" })` instead: the canvas is relit in place rather than rebuilt. `Graph`, `S` and `document` are also on it for tests; treat them as private.
 
 ## 4. Describe your graph: the adapter
 

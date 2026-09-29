@@ -6,7 +6,7 @@
    have the same specificity as these rules and win by coming later, which is why a kind's
    look lives in a file of its own rather than inline or in the base.
 
-   A NEW KIND: copy one kind's nine rules below under a heading for your tool, rename the kind,
+   A NEW KIND: copy one kind's eleven rules below under a heading for your tool, rename the kind,
    and keep `#rrggbb` equal to your adapter's `kinds[i].tint` (the wires are graded in it).
    Kind names are shared by every graph, so make yours distinct (a CEG graph's "emitter" is
    fine; a second tool's "emitter" would take its colours). A kind with no rules is grey.
@@ -22,6 +22,8 @@
 .ng-graph-minimap-emitter { background-color: #f77a9d; }
 .ng-palette-row-emitter .ng-palette-kind { color: #f77a9d; }
 #ng-find-emitter.active { background-color: #f77a9d; border-color: #f77a9d; }
+.ng-node.ng-node-emitter:hover .ng-port-idle .ng-port-dot { background-color: #f77a9d80; }
+.ng-node.ng-node-emitter .ng-port:hover .ng-port-dot { background-color: #f77a9d; }
 .ng-node-spawner { border-color: #8fd46280; decorator: vertical-gradient(#1f3016 #131d0d); }
 .ng-node-spawner:hover { decorator: vertical-gradient(#29401d #192812); }
 .ng-node-spawner .ng-node-title { color: #cdf2b4; }
@@ -31,6 +33,8 @@
 .ng-graph-minimap-spawner { background-color: #8fd462; }
 .ng-palette-row-spawner .ng-palette-kind { color: #8fd462; }
 #ng-find-spawner.active { background-color: #8fd462; border-color: #8fd462; }
+.ng-node.ng-node-spawner:hover .ng-port-idle .ng-port-dot { background-color: #8fd46280; }
+.ng-node.ng-node-spawner .ng-port:hover .ng-port-dot { background-color: #8fd462; }
 .ng-node-particle { border-color: #e6e9f080; decorator: vertical-gradient(#26272c #18191d); }
 .ng-node-particle:hover { decorator: vertical-gradient(#33353b #202126); }
 .ng-node-particle .ng-node-title { color: #f4f6fa; }
@@ -40,3 +44,8 @@
 .ng-graph-minimap-particle { background-color: #e6e9f0; }
 .ng-palette-row-particle .ng-palette-kind { color: #e6e9f0; }
 #ng-find-particle.active { background-color: #e6e9f0; border-color: #e6e9f0; }
+.ng-node.ng-node-particle:hover .ng-port-idle .ng-port-dot { background-color: #e6e9f080; }
+.ng-node.ng-node-particle .ng-port:hover .ng-port-dot { background-color: #e6e9f0; }
+/* The last two of each kind are its ports on a hovered node: dimmed while nothing is plugged
+   in, full under the pointer. One class deeper than the state rules in node_graph_after.rcss,
+   which they have to beat from an earlier sheet. */

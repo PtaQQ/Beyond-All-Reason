@@ -75,6 +75,13 @@ function widget:Update()
 	end
 end
 
+-- The wires are drawn on the GPU, so the host needs a draw call-in too.
+function widget:DrawScreen()
+	if host then
+		host.draw()
+	end
+end
+
 function widget:MouseWheel(up, _value)
 	return host ~= nil and host.mouseWheel(up)
 end
